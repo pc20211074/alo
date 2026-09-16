@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>18m Budget 4-A-Side FPL Tracker & Admin Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel standalone for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        input, textarea, select {
+            user-select: auto;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #070a10;
+            color: #f0f6fc;
+            overscroll-behavior-y: none;
+        }
+        .fpl-pitch-stripes {
+            background: repeating-linear-gradient(
+                0deg,
+                #00874e,
+                #00874e 32px,
+                #006e3f 32px,
+                #006e3f 64px
+            );
+        }
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start p-0 sm:p-4 selection:bg-purple-500 selection:text-white antialiased">
+
+    <div id="root" class="w-full max-w-md sm:max-w-2xl mx-auto min-h-screen flex flex-col relative bg-slate-950 shadow-2xl sm:rounded-3xl sm:border sm:border-slate-800 overflow-hidden"></div>
+
+    <script type="text/babel">
+        const DEFAULT_PLAYERS = [
+            { id: 'p1', name: '維維', price: 3.0, position: 'DEF' },
+            { id: 'p2', name: '咖哩', price: 6.0, position: 'MID' },
+            { id: 'p3', name: '世朗', price: 5.0, position: 'DEF' },
+            { id: 'p4', name: 'Adam', price: 3.0, position: 'DEF' },
+            { id: 'p5', name: '浩揚', price: 8.0, position: 'ATT' },
+            { id: 'p6', name: 'Lolo', price: 3.5, position: 'DEF' },
+            { id: 'p7', name: 'Ian', price: 4.5, position: 'DEF' },
+            { id: 'p8', name: 'Peewa', price: 5.5, position: 'ATT' },
+            { id: 'p9', name: '重恩', price: 3.5, position: 'DEF' },
+            { id: 'p10', name: '以式', price: 5.0, position: 'MID' },
+            { id: 'p11', name: '信', price: 2.0, position: 'DEF' },
+            { id: 'p12', name: '甘', price: 3.0, position: 'MID' },
+            { id: 'p13', name: 'Hayto', price: 6.5, position: 'MID' },
+            { id: 'p14', name: '天浠', price: 5.5, position: 'ATT' },
+            { id: 'p15', name: 'Gavin', price: 2.0, position: 'DEF' },
+            { id: 'p16', name: 'Summer', price: 2.5, position: 'ATT' },
+            { id: 'p17', name: '柏朗', price: 4.0, position: 'MID' },
+            { id: 'p18', name: 'Ocean', price: 4.0, position: 'DEF' },
+            { id: 'p19', name: '史', price: 4.0, position: 'DEF' }
+        ];
+
+        const FORMATIONS = {
+            '1-2-1': [
+                { key: 'def1', pos: 'DEF', label: '後衛 (DEF)' },
+                { key: 'mid1', pos: 'MID', label: '中場 (MID 1)' },
+                { key: 'mid2', pos: 'MID', label: '中場 (MID 2)' },
+                { key: 'att1', pos: 'ATT', label: '前鋒 (ATT)' }
+            ],
+            '2-1-1': [
+                { key: 'def1', pos: 'DEF', label: '後衛 (DEF 1)' },
+                { key: 'def2', pos: 'DEF', label: '後衛 (DEF 2)' },
+                { key: 'mid1', pos: 'MID', label: '中場 (MID)' },
+                { key: 'att1', pos: 'ATT', label: '前鋒 (ATT)' }
+            ],
+            '1-1-2': [
+                { key: 'def1', pos: 'DEF', label: '後衛 (DEF)' },
+                { key: 'mid1', pos: 'MID', label: '中場 (MID)' },
+                { key: 'att1', pos: 'ATT', label: '前鋒 (ATT 1)' },
+                { key: 'att2', pos: 'ATT', label: '前鋒 (ATT 2)' }
+            ]
+        };
+
+        function calculatePlayerPoints(player, stats = {}) {
+            if (!player) return 0;
+            let pts = 0;
+            const mins = Math.min(75, stats.minutes || 0);
+            const goals = stats.goals || 0;
+            const assists = stats.assists || 0;
+            const cleanSheet = stats.cleanSheet || false;
+            const yellowCards = stats.yellowCards || 0;
+            const redCards = stats.redCards || 0;
+            const ownGoals = stats.ownGoals || 0;
+            const bonus = stats.bonus || 0;
+
+            if (mins >= 40) pts += 2;
+            else if (mins > 0) pts += 1;
+
+            if (player.position === 'DEF') pts += goals * 6;
+            else if (player.position === 'MID') pts += goals * 5;
+            else if (player.position === 'ATT') pts += goals * 4;
+
+            pts += assists * 3;
+
+            if (cleanSheet && mins >= 40) {
+                if (player.position === 'DEF') pts += 4;
+                if (player.position === 'MID') pts += 1;
+            }
+
+            pts -= yellowCards * 1;
+            pts -= redCards * 3;
+            pts -= ownGoals * 2;
+            pts += bonus;
+
+            return pts;
+        }
+
+        function calculateTeamTotalPoints(team, playerStats = {}, playerList = DEFAULT_PLAYERS) {
+            if (!team || !team.slotSelections) return 0;
+            let total = 0;
+
+            Object.values(team.slotSelections).forEach(pid => {
+                if (!pid) return;
+                const player = playerList.find(p => p.id === pid);
+                if (!player) return;
+
+                let pPts = calculatePlayerPoints(player, playerStats[pid]);
+                if (team.captainId === pid) {
+                    pPts *= 2;
+                }
+                total += pPts;
+            });
+
+            const activeChip = team.activeChip;
+            if (activeChip === 'desmond') {
+                if (team.desmondResult === 'win') total += 3;
+                if (team.desmondResult === 'loss') total -= 3;
+            }
+
+            if (activeChip === 'benjie') {
+                if (team.benjieCS) total += 6;
+            }
+
+            return total;
+        }
+
+        function ConfirmationModal({ config, onClose }) {
+            if (!config) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+                        <div className="flex items-center space-x-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${config.isDanger ? 'bg-red-950 text-red-400 border border-red-500/40' : 'bg-amber-950 text-amber-400 border border-amber-500/40'}`}>
+                                <i className={`fas ${config.isDanger ? 'fa-triangle-exclamation' : 'fa-circle-question'}`}></i>
+                            </div>
+                            <h3 className="font-black text-base text-white">{config.title || '確認操作'}</h3>
+                        </div>
+                        <p className="text-xs text-slate-300 font-medium leading-relaxed whitespace-pre-line">
+                            {config.message}
+                        </p>
+                        <div className="flex space-x-2 pt-2">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl text-xs transition active:scale-95"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (config.onConfirm) config.onConfirm();
+                                    onClose();
+                                }}
+                                className={`flex-1 font-black py-2.5 rounded-xl text-xs transition active:scale-95 text-slate-950 ${config.isDanger ? 'bg-red-500 hover:bg-red-400 text-white' : 'bg-amber-400 hover:bg-amber-300'}`}
+                            >
+                                {config.actionText || '確定執行'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function RenderFplSlotCard({ slot, slotSelections, setCaptainId, captainId, setActivePickerSlot, playerStats, playerList, isLocked }) {
+            const selectedPid = slotSelections[slot.key];
+            const player = playerList.find(p => p.id === selectedPid);
+            const isCaptain = player && captainId === player.id;
+            const pStat = player ? (playerStats[player.id] || {}) : {};
+            const rawPts = player ? calculatePlayerPoints(player, pStat) : 0;
+            const calcPts = isCaptain ? rawPts * 2 : rawPts;
+
+            return (
+                <div key={slot.key} className="w-20 sm:w-24 flex flex-col items-center relative active:scale-95 transition-transform duration-150">
+                    {player && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isLocked) setCaptainId(player.id);
+                            }}
+                            title={isLocked ? "陣容已鎖定" : "點擊設為隊長 (Captain 2x)"}
+                            className={`absolute -top-3 -right-1 font-black text-xs w-7 h-7 rounded-full flex items-center justify-center border-2 border-slate-950 z-20 shadow-lg transition ${isLocked ? 'cursor-not-allowed opacity-80' : 'active:scale-90'} ${isCaptain ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 animate-pulse' : 'bg-slate-800 text-slate-300 hover:bg-amber-400 hover:text-slate-950'}`}
+                        >
+                            C
+                        </button>
+                    )}
+
+                    {player && (
+                        <div className="absolute -top-3 -left-1 font-extrabold text-[10px] px-1.5 py-0.5 rounded-full bg-slate-900 border border-emerald-400 text-emerald-400 z-20 shadow">
+                            +{calcPts}分
+                        </div>
+                    )}
+
+                    <div 
+                        onClick={() => { if (!isLocked) setActivePickerSlot(slot); }}
+                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-t-xl flex flex-col items-center justify-center border shadow-lg ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${player ? 'bg-slate-950/90 border-white/40 hover:border-amber-400' : 'bg-slate-900/50 border-dashed border-white/40 hover:border-white'}`}
+                    >
+                        {player ? (
+                            <svg className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-md" viewBox="0 0 24 24" fill={player.position === 'DEF' ? '#38003c' : player.position === 'MID' ? '#002f6c' : '#bd0026'}>
+                                <path d="M12 4.2L8.5 2 2 5.5l2.5 4.5L7 8.5V21h10V8.5l2.5 1.5L22 5.5 15.5 2 12 4.2z" stroke="#ffffff" strokeWidth="1.2" />
+                            </svg>
+                        ) : (
+                            <i className="fas fa-plus text-white/60 text-lg sm:text-xl"></i>
+                        )}
+                    </div>
+
+                    <div 
+                        onClick={() => { if (!isLocked) setActivePickerSlot(slot); }}
+                        className={`w-full font-black text-[10px] sm:text-xs py-1 px-1 text-center truncate shadow-md ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'} ${player ? 'bg-white text-slate-950' : 'bg-slate-900/90 text-slate-300'}`}
+                    >
+                        {player ? player.name : slot.label}
+                    </div>
+
+                    <div 
+                        onClick={() => { if (!isLocked) setActivePickerSlot(slot); }}
+                        className={`w-full bg-[#38003c] text-[#00ff87] font-black text-[10px] sm:text-xs py-0.5 text-center rounded-b-lg shadow-md border-t border-purple-900/50 ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                        {player ? `£${player.price.toFixed(1)}m` : '選擇球員'}
+                    </div>
+                </div>
+            );
+        }
+
+        function LeagueSettingsTab({ leagueState, updateLeagueState, showNotification, requestConfirmation }) {
+            const [announcementText, setAnnouncementText] = React.useState(leagueState.announcement || '');
+            const [deadlineInput, setDeadlineInput] = React.useState(
+                leagueState.deadline ? new Date(leagueState.deadline).toISOString().slice(0, 16) : ''
+            );
+
+            React.useEffect(() => {
+                setAnnouncementText(leagueState.announcement || '');
+                if (leagueState.deadline) {
+                    const dt = new Date(leagueState.deadline);
+                    if (!isNaN(dt.getTime())) {
+                        setDeadlineInput(dt.toISOString().slice(0, 16));
+                    }
+                }
+            }, [leagueState.announcement, leagueState.deadline]);
+
+            const handleSaveAnnouncement = () => {
+                updateLeagueState({ announcement: announcementText.trim() });
+                showNotification('📢 聯賽即時廣播公告已更新！');
+            };
+
+            const handleClearAnnouncement = () => {
+                setAnnouncementText('');
+                updateLeagueState({ announcement: '' });
+                showNotification('🧹 已清空廣播公告');
+            };
+
+            const handleSaveDeadline = () => {
+                if (!deadlineInput) {
+                    updateLeagueState({ deadline: null });
+                    showNotification('🔓 截止時間已取消（開放自由修改）');
+                    return;
+                }
+                const isoStr = new Date(deadlineInput).toISOString();
+                updateLeagueState({ deadline: isoStr });
+                showNotification(`⏳ 陣容截止時間已設定為: ${new Date(isoStr).toLocaleString('zh-HK')}`);
+            };
+
+            const setQuickDeadline = (hoursFromNow) => {
+                if (hoursFromNow === 0) {
+                    const nowIso = new Date().toISOString();
+                    setDeadlineInput(nowIso.slice(0, 16));
+                    updateLeagueState({ deadline: nowIso });
+                    showNotification('🔒 已庫存並立即鎖定所有陣容！');
+                    return;
+                }
+                const target = new Date(Date.now() + hoursFromNow * 3600 * 1000);
+                const isoStr = target.toISOString();
+                setDeadlineInput(isoStr.slice(0, 16));
+                updateLeagueState({ deadline: isoStr });
+                showNotification(`⏳ 已設定倒數 ${hoursFromNow} 小時截止`);
+            };
+
+            const executeEndGameweek = () => {
+                const playerList = leagueState.playerCatalog || DEFAULT_PLAYERS;
+                const playerStats = leagueState.playerStats || {};
+                const currentGw = leagueState.currentGameweek || 1;
+                const teamHistory = leagueState.teamHistory || {};
+
+                const updatedTeams = (leagueState.teams || []).map(team => {
+                    let gwTotal = calculateTeamTotalPoints(team, playerStats, playerList);
+                    const existingCumulative = team.cumulativePoints || 0;
+                    const newCumulative = existingCumulative + gwTotal;
+
+                    const teamHist = teamHistory[team.id] || {};
+                    teamHist[currentGw] = { gwPoints: gwTotal, cumulative: newCumulative };
+                    teamHistory[team.id] = teamHist;
+
+                    // Record chip usage into usedChips array
+                    const prevUsedChips = team.usedChips || [];
+                    const newUsedChips = (team.activeChip && team.activeChip !== 'none' && !prevUsedChips.includes(team.activeChip))
+                        ? [...prevUsedChips, team.activeChip]
+                        : prevUsedChips;
+
+                    return {
+                        ...team,
+                        cumulativePoints: newCumulative,
+                        lastGwPoints: gwTotal,
+                        usedChips: newUsedChips,
+                        activeChip: 'none',
+                        desmondResult: 'none',
+                        benjieCS: false
+                    };
+                });
+
+                updateLeagueState({
+                    teams: updatedTeams,
+                    playerStats: {},
+                    teamHistory: teamHistory,
+                    currentGameweek: currentGw + 1
+                });
+
+                showNotification(`🏆 第 ${currentGw} 輪已順利結束！分數已累積至總榜，特權卡已記錄，並開啟第 ${currentGw + 1} 輪。`);
+            };
+
+            const handleEndGameweekClick = () => {
+                requestConfirmation({
+                    title: `結束第 ${leagueState.currentGameweek || 1} 輪賽事 (Gameweek End)`,
+                    message: '確定要結算今輪賽事嗎？\n1. 將會把每支隊伍今輪的分數累加至總積分 (Total Points)\n2. 已使用的特權卡將永久標記為已使用 (Single-Use)\n3. 歸零球員今輪數據以準備下一輪！',
+                    actionText: '確定結算本輪',
+                    isDanger: false,
+                    onConfirm: executeEndGameweek
+                });
+            };
+
+            const executeResetToGw1 = () => {
+                const resetTeams = (leagueState.teams || []).map(team => ({
+                    ...team,
+                    cumulativePoints: 0,
+                    lastGwPoints: 0,
+                    usedChips: [], // Clear used chips back to GW1
+                    activeChip: 'none',
+                    desmondResult: 'none',
+                    benjieCS: false
+                }));
+
+                updateLeagueState({
+                    teams: resetTeams,
+                    playerStats: {},
+                    teamHistory: {},
+                    currentGameweek: 1
+                });
+
+                showNotification('🔄 聯賽已成功重置回第 1 輪！所有積分、數據、歷史與特權卡使用次數已完全歸零恢復。');
+            };
+
+            const handleResetToGw1Click = () => {
+                requestConfirmation({
+                    title: '警告：重置聯賽至 Game Week 1',
+                    message: '確定要將聯賽完全重置嗎？\n這將會清空所有隊伍的累積總積分、歷史紀錄、球員比賽數據及特權卡使用紀錄（重置後玩家可再次使用所有特權卡）。此操作無法復原！',
+                    actionText: '重置所有數據',
+                    isDanger: true,
+                    onConfirm: executeResetToGw1
+                });
+            };
+
+            return (
+                <div className="space-y-4 p-4">
+                    {/* Gameweek Finalize Control */}
+                    <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/40 rounded-2xl p-4 space-y-3 shadow-xl">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                                <i className="fas fa-flag-checkered text-amber-400"></i>
+                                賽輪結算 (Gameweek End) - 目前第 {leagueState.currentGameweek || 1} 輪
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 font-medium leading-relaxed">
+                            點擊下方按鈕將計算所有球隊今輪得分，永久累加至總排行榜 (Cumulative Leaderboard)，將已發動特權卡標記為已耗用，並將球員單場表現數據歸零以供下一輪錄入。
+                        </p>
+                        <button
+                            onClick={handleEndGameweekClick}
+                            className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 rounded-xl text-xs transition active:scale-95 shadow-lg flex items-center justify-center gap-2"
+                        >
+                            <i className="fas fa-trophy"></i> 結束本輪賽事並累積積分 (Gameweek End)
+                        </button>
+                    </div>
+
+                    {/* Broadcast Banner Control */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                                <i className="fas fa-bullhorn text-amber-400"></i>
+                                聯賽即時廣播公告 (Announcement)
+                            </span>
+                        </div>
+                        <textarea
+                            rows="3"
+                            placeholder="輸入發佈給所有玩家的即時消息 (例如: 第 1 輪比賽即將於 15:00 開賽...)"
+                            value={announcementText}
+                            onChange={(e) => setAnnouncementText(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-semibold text-white focus:outline-none focus:border-amber-400"
+                        />
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={handleSaveAnnouncement}
+                                className="flex-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-2.5 rounded-xl text-xs transition active:scale-95 shadow"
+                            >
+                                <i className="fas fa-paper-plane mr-1"></i> 發佈廣播
+                            </button>
+                            <button
+                                onClick={handleClearAnnouncement}
+                                className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2.5 rounded-xl text-xs transition active:scale-95"
+                            >
+                                清除
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Deadline Control */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                                <i className="fas fa-clock text-amber-400"></i>
+                                陣容提交截止時間 (Deadline Lock)
+                            </span>
+                        </div>
+
+                        <div className="flex flex-col space-y-2">
+                            <label className="text-[11px] text-slate-400 font-bold">選擇日期與時間:</label>
+                            <input
+                                type="datetime-local"
+                                value={deadlineInput}
+                                onChange={(e) => setDeadlineInput(e.target.value)}
+                                className="bg-slate-950 border border-slate-800 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-amber-400"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                            <button
+                                onClick={() => setQuickDeadline(0)}
+                                className="bg-red-950/80 hover:bg-red-900 border border-red-500/50 text-red-300 font-extrabold py-2 rounded-xl text-[11px] transition active:scale-95"
+                            >
+                                🔒 立即鎖定
+                            </button>
+                            <button
+                                onClick={() => setQuickDeadline(1)}
+                                className="bg-amber-950/80 hover:bg-amber-900 border border-amber-500/50 text-amber-300 font-extrabold py-2 rounded-xl text-[11px] transition active:scale-95"
+                            >
+                                ⏳ 1 小時後截止
+                            </button>
+                            <button
+                                onClick={() => setQuickDeadline(24)}
+                                className="bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/50 text-indigo-300 font-extrabold py-2 rounded-xl text-[11px] transition active:scale-95"
+                            >
+                                📅 24 小時後截止
+                            </button>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800 flex space-x-2">
+                            <button
+                                onClick={handleSaveDeadline}
+                                className="flex-1 bg-[#00ff87] hover:bg-[#00e077] text-slate-950 font-black py-2.5 rounded-xl text-xs transition active:scale-95 shadow"
+                            >
+                                保存截止設定
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Reset to Gameweek 1 Control */}
+                    <div className="bg-gradient-to-r from-red-950/60 to-slate-900 border border-red-500/40 rounded-2xl p-4 space-y-3 shadow-xl">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-red-400 uppercase tracking-wider flex items-center gap-2">
+                                <i className="fas fa-rotate-left text-red-400"></i>
+                                重置聯賽至 Game Week 1
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 font-medium leading-relaxed">
+                            將聯賽進度完全重置回第 1 輪。此操作會清空所有隊伍的累積積分 (Cumulative Points)、歷史紀錄 (Team History)、已使用的特權卡紀錄 (Chips) 及球員單場表現數據。
+                        </p>
+                        <button
+                            onClick={handleResetToGw1Click}
+                            className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-3 rounded-xl text-xs transition active:scale-95 shadow-lg flex items-center justify-center gap-2"
+                        >
+                            <i className="fas fa-triangle-exclamation"></i> 重置所有數據至 Game Week 1
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function PlayerCatalogTab({ leagueState, updateLeagueState, showNotification }) {
+            const playerList = leagueState.playerCatalog || DEFAULT_PLAYERS;
+            const [editingPlayer, setEditingPlayer] = React.useState(null);
+            const [newPlayerName, setNewPlayerName] = React.useState('');
+            const [newPlayerPos, setNewPlayerPos] = React.useState('DEF');
+            const [newPlayerPrice, setNewPlayerPrice] = React.useState('4.0');
+            const [filterPos, setFilterPos] = React.useState('ALL');
+
+            const handleSavePlayer = () => {
+                if (!newPlayerName.trim()) {
+                    showNotification('⚠️ 請輸入球員姓名！');
+                    return;
+                }
+                const priceNum = parseFloat(newPlayerPrice);
+                if (isNaN(priceNum) || priceNum <= 0) {
+                    showNotification('⚠️ 請輸入有效價格！');
+                    return;
+                }
+
+                let updatedList;
+                if (editingPlayer) {
+                    updatedList = playerList.map(p => p.id === editingPlayer.id ? { ...p, name: newPlayerName.trim(), position: newPlayerPos, price: priceNum } : p);
+                    showNotification(`✅ 已更新球員 ${newPlayerName}`);
+                } else {
+                    const newId = 'p_' + Date.now();
+                    updatedList = [...playerList, { id: newId, name: newPlayerName.trim(), position: newPlayerPos, price: priceNum }];
+                    showNotification(`✅ 已新增球員 ${newPlayerName}`);
+                }
+
+                updateLeagueState({ playerCatalog: updatedList });
+                setEditingPlayer(null);
+                setNewPlayerName('');
+                setNewPlayerPrice('4.0');
+            };
+
+            const handleEditClick = (p) => {
+                setEditingPlayer(p);
+                setNewPlayerName(p.name);
+                setNewPlayerPos(p.position);
+                setNewPlayerPrice(p.price.toString());
+            };
+
+            const handleDeletePlayer = (id, name) => {
+                const updatedList = playerList.filter(p => p.id !== id);
+                updateLeagueState({ playerCatalog: updatedList });
+                showNotification(`🗑️ 已刪除球員: ${name}`);
+            };
+
+            const handleResetDefaults = () => {
+                updateLeagueState({ playerCatalog: DEFAULT_PLAYERS });
+                showNotification('🔄 已重置球員名單為預設陣容！');
+            };
+
+            const filteredList = playerList.filter(p => filterPos === 'ALL' || p.position === filterPos);
+
+            return (
+                <div className="space-y-4 p-4">
+                    {/* Add / Edit Form */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                                <i className="fas fa-user-plus text-amber-400"></i>
+                                {editingPlayer ? `編輯球員 (${editingPlayer.name})` : '新增球員資料'}
+                            </span>
+                            {editingPlayer && (
+                                <button
+                                    onClick={() => { setEditingPlayer(null); setNewPlayerName(''); setNewPlayerPrice('4.0'); }}
+                                    className="text-[10px] text-slate-400 font-bold underline"
+                                >
+                                    取消編輯
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">球員姓名</label>
+                                <input
+                                    type="text"
+                                    placeholder="姓名"
+                                    value={newPlayerName}
+                                    onChange={(e) => setNewPlayerName(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">位置 (Position)</label>
+                                <select
+                                    value={newPlayerPos}
+                                    onChange={(e) => setNewPlayerPos(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400"
+                                >
+                                    <option value="DEF">DEF (後衛)</option>
+                                    <option value="MID">MID (中場)</option>
+                                    <option value="ATT">ATT (前鋒)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">身價 (£m)</label>
+                                <input
+                                    type="number"
+                                    step="0.5"
+                                    placeholder="4.0"
+                                    value={newPlayerPrice}
+                                    onChange={(e) => setNewPlayerPrice(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400"
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleSavePlayer}
+                            className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-2.5 rounded-xl text-xs transition active:scale-95 shadow"
+                        >
+                            {editingPlayer ? '儲存球員變更' : '＋ 新增至球員名單'}
+                        </button>
+                    </div>
+
+                    {/* Catalog List */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
+                                球員名單 ({playerList.length} 人)
+                            </span>
+
+                            <div className="flex space-x-1">
+                                {['ALL', 'DEF', 'MID', 'ATT'].map(pos => (
+                                    <button
+                                        key={pos}
+                                        onClick={() => setFilterPos(pos)}
+                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border transition ${filterPos === pos ? 'bg-amber-400 border-amber-400 text-slate-950' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                                    >
+                                        {pos}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+                            {filteredList.map(p => (
+                                <div key={p.id} className="bg-slate-950 border border-slate-800/80 rounded-xl p-2.5 flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <span className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] ${p.position === 'DEF' ? 'bg-purple-950 text-purple-300 border border-purple-500/40' : p.position === 'MID' ? 'bg-blue-950 text-blue-300 border border-blue-500/40' : 'bg-red-950 text-red-300 border border-red-500/40'}`}>
+                                            {p.position}
+                                        </span>
+                                        <span className="font-extrabold text-xs text-white">{p.name}</span>
+                                    </div>
+
+                                    <div className="flex items-center space-x-3">
+                                        <span className="font-black text-xs text-[#00ff87]">£{p.price.toFixed(1)}m</span>
+                                        <button
+                                            onClick={() => handleEditClick(p)}
+                                            className="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center justify-center transition"
+                                            title="編輯"
+                                        >
+                                            <i className="fas fa-edit"></i>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeletePlayer(p.id, p.name)}
+                                            className="w-7 h-7 bg-red-950/60 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-lg text-xs flex items-center justify-center transition"
+                                            title="刪除"
+                                        >
+                                            <i className="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800 flex justify-end">
+                            <button
+                                onClick={handleResetDefaults}
+                                className="text-[11px] font-bold text-slate-400 hover:text-amber-400 transition flex items-center gap-1"
+                            >
+                                <i className="fas fa-rotate-left"></i> 重置為預設 19 人名單
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function StatsEntryTab({ leagueState, updateLeagueState, showNotification }) {
+            const playerList = leagueState.playerCatalog || DEFAULT_PLAYERS;
+            const [selectedPlayerId, setSelectedPlayerId] = React.useState(playerList[0]?.id || '');
+            const [statsMap, setStatsMap] = React.useState(leagueState.playerStats || {});
+
+            React.useEffect(() => {
+                if (leagueState.playerStats) {
+                    setStatsMap(leagueState.playerStats);
+                }
+            }, [leagueState.playerStats]);
+
+            const currentPlayer = playerList.find(p => p.id === selectedPlayerId) || playerList[0];
+            const currentStat = (currentPlayer && statsMap[currentPlayer.id]) ? statsMap[currentPlayer.id] : {
+                minutes: 0,
+                goals: 0,
+                assists: 0,
+                cleanSheet: false,
+                yellowCards: 0,
+                redCards: 0,
+                ownGoals: 0,
+                bonus: 0
+            };
+
+            const updateStatValue = (key, val) => {
+                if (!currentPlayer) return;
+                const newPlayerStat = { ...currentStat, [key]: val };
+                const newStatsMap = { ...statsMap, [currentPlayer.id]: newPlayerStat };
+                setStatsMap(newStatsMap);
+            };
+
+            const handleSaveStats = () => {
+                updateLeagueState({ playerStats: statsMap });
+                showNotification('✅ 比賽數據已成功儲存並重新計算排行榜分數！');
+            };
+
+            const handleResetAllStats = () => {
+                setStatsMap({});
+                updateLeagueState({ playerStats: {} });
+                showNotification('🧹 已清空所有球員比賽數據！');
+            };
+
+            const previewPts = currentPlayer ? calculatePlayerPoints(currentPlayer, currentStat) : 0;
+
+            return (
+                <div className="space-y-4 p-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                                <i className="fas fa-calculator text-amber-400"></i>
+                                球員單場數據錄入 (Match Stats Entry)
+                            </span>
+                            <button
+                                onClick={handleResetAllStats}
+                                className="text-[10px] text-red-400 hover:text-red-300 font-bold underline"
+                            >
+                                清空所有數據
+                            </button>
+                        </div>
+
+                        {/* Player Picker */}
+                        <div>
+                            <label className="text-[11px] text-slate-400 font-bold block mb-1">選擇球員:</label>
+                            <select
+                                value={selectedPlayerId}
+                                onChange={(e) => setSelectedPlayerId(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl p-3 text-sm font-extrabold focus:outline-none focus:border-amber-400"
+                            >
+                                {playerList.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        [{p.position}] {p.name} - £{p.price.toFixed(1)}m
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {currentPlayer && (
+                            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+                                <div>
+                                    <div className="font-black text-sm text-white">{currentPlayer.name} ({currentPlayer.position})</div>
+                                    <div className="text-[10px] text-slate-400">進球得分權重: {currentPlayer.position === 'DEF' ? '+6分' : currentPlayer.position === 'MID' ? '+5分' : '+4分'}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[9px] text-slate-400 uppercase font-black">計算總分</div>
+                                    <div className="text-xl font-black text-[#00ff87]">{previewPts} 分</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Stats Form Controls */}
+                        {currentPlayer && (
+                            <div className="space-y-3 pt-2">
+                                {/* Minutes */}
+                                <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                                    <span className="text-xs font-bold text-slate-300">上場時間 (分鐘, 滿40分+2pts)</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="75"
+                                        value={currentStat.minutes}
+                                        onChange={(e) => updateStatValue('minutes', parseInt(e.target.value) || 0)}
+                                        className="w-20 bg-slate-900 border border-slate-700 text-center text-white font-extrabold rounded-lg py-1 text-xs"
+                                    />
+                                </div>
+
+                                {/* Goals */}
+                                <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                                    <span className="text-xs font-bold text-slate-300">入球 (Goals)</span>
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={() => updateStatValue('goals', Math.max(0, currentStat.goals - 1))} className="w-7 h-7 bg-slate-800 text-white rounded-lg font-bold">-</button>
+                                        <span className="w-8 text-center font-black text-sm text-white">{currentStat.goals}</span>
+                                        <button onClick={() => updateStatValue('goals', currentStat.goals + 1)} className="w-7 h-7 bg-amber-400 text-slate-950 rounded-lg font-black">+</button>
+                                    </div>
+                                </div>
+
+                                {/* Assists */}
+                                <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                                    <span className="text-xs font-bold text-slate-300">助攻 (Assists +3pts)</span>
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={() => updateStatValue('assists', Math.max(0, currentStat.assists - 1))} className="w-7 h-7 bg-slate-800 text-white rounded-lg font-bold">-</button>
+                                        <span className="w-8 text-center font-black text-sm text-white">{currentStat.assists}</span>
+                                        <button onClick={() => updateStatValue('assists', currentStat.assists + 1)} className="w-7 h-7 bg-amber-400 text-slate-950 rounded-lg font-black">+</button>
+                                    </div>
+                                </div>
+
+                                {/* Clean Sheet */}
+                                <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                                    <span className="text-xs font-bold text-slate-300">不失球 (Clean Sheet)</span>
+                                    <button
+                                        onClick={() => updateStatValue('cleanSheet', !currentStat.cleanSheet)}
+                                        className={`px-3 py-1 rounded-lg text-xs font-extrabold transition ${currentStat.cleanSheet ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}
+                                    >
+                                        {currentStat.cleanSheet ? '是 (YES)' : '否 (NO)'}
+                                    </button>
+                                </div>
+
+                                {/* Cards & Penalties */}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex justify-between items-center">
+                                        <span className="text-[11px] font-bold text-yellow-400">黃牌 (-1pt)</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={currentStat.yellowCards}
+                                            onChange={(e) => updateStatValue('yellowCards', parseInt(e.target.value) || 0)}
+                                            className="w-12 bg-slate-900 text-center text-white font-bold rounded-lg py-1 text-xs"
+                                        />
+                                    </div>
+                                    <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex justify-between items-center">
+                                        <span className="text-[11px] font-bold text-red-400">紅牌 (-3pts)</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={currentStat.redCards}
+                                            onChange={(e) => updateStatValue('redCards', parseInt(e.target.value) || 0)}
+                                            className="w-12 bg-slate-900 text-center text-white font-bold rounded-lg py-1 text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Bonus */}
+                                <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                                    <span className="text-xs font-bold text-amber-300">額外紅利分 (Bonus Points)</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="3"
+                                        value={currentStat.bonus}
+                                        onChange={(e) => updateStatValue('bonus', parseInt(e.target.value) || 0)}
+                                        className="w-16 bg-slate-900 border border-slate-700 text-center text-white font-extrabold rounded-lg py-1 text-xs"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleSaveStats}
+                            className="w-full bg-[#00ff87] hover:bg-[#00e077] text-slate-950 font-black py-3 rounded-xl text-xs transition active:scale-95 shadow-lg mt-2"
+                        >
+                            💾 保存數據並更新聯賽總榜
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function TeamsResolutionTab({ leagueState, updateLeagueState, showNotification, requestConfirmation }) {
+            const playerList = leagueState.playerCatalog || DEFAULT_PLAYERS;
+            const teams = leagueState.teams || [];
+
+            const handleUpdateTeamChipOutcome = (teamObj, chipKey, val) => {
+                const updatedTeam = { ...teamObj, [chipKey]: val, updatedAt: Date.now() };
+                const updatedTeams = teams.map(t => t.id === teamObj.id ? updatedTeam : t);
+                updateLeagueState({ teams: updatedTeams });
+                showNotification(`✅ 已更新隊伍 [${teamObj.teamName}] 特權卡結果`);
+            };
+
+            const executeDeleteTeam = (teamId, teamName) => {
+                const updatedTeams = teams.filter(t => t.id !== teamId);
+                updateLeagueState({ teams: updatedTeams });
+                showNotification(`🗑️ 已成功刪除隊伍: ${teamName}`);
+            };
+
+            const handleDeleteTeam = (teamId, teamName) => {
+                requestConfirmation({
+                    title: `刪除隊伍: ${teamName}`,
+                    message: `確定要刪除隊伍「${teamName}」嗎？此操作無法復原。`,
+                    actionText: '刪除隊伍',
+                    isDanger: true,
+                    onConfirm: () => executeDeleteTeam(teamId, teamName)
+                });
+            };
+
+            return (
+                <div className="space-y-4 p-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                                <i className="fas fa-users-gear text-amber-400"></i>
+                                隊伍審查與特權卡 (Chips) 結算
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-bold">共 {teams.length} 隊</span>
+                        </div>
+
+                        <div className="space-y-3">
+                            {teams.length === 0 ? (
+                                <div className="text-center py-8 text-xs text-slate-500">尚無玩家提交隊伍</div>
+                            ) : (
+                                teams.map(team => {
+                                    const currentGwPts = calculateTeamTotalPoints(team, leagueState.playerStats || {}, playerList);
+                                    const cumulativeTotal = (team.cumulativePoints || 0) + currentGwPts;
+                                    const usedChips = team.usedChips || [];
+                                    return (
+                                        <div key={team.id} className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-2 shadow">
+                                            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                                                <div>
+                                                    <div className="font-extrabold text-sm text-white flex items-center gap-2">
+                                                        <span>{team.teamName}</span>
+                                                        <span className="text-[9px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded font-black">
+                                                            {team.formation}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400 mt-0.5">
+                                                        已累積總分: <span className="text-amber-400 font-bold">{team.cumulativePoints || 0}</span> ＋ 今輪即時: <span className="text-emerald-400 font-bold">{currentGwPts}</span>
+                                                    </div>
+                                                    {usedChips.length > 0 && (
+                                                        <div className="text-[9px] text-purple-400 mt-0.5 font-bold">
+                                                            已消耗特權卡: {usedChips.join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="text-right">
+                                                        <div className="text-[9px] text-slate-400 uppercase font-black">總積分</div>
+                                                        <div className="text-base font-black text-[#00ff87]">{cumulativeTotal} 分</div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleDeleteTeam(team.id, team.teamName)}
+                                                        className="w-7 h-7 bg-red-950/80 hover:bg-red-900 border border-red-500/50 text-red-300 rounded-lg text-xs flex items-center justify-center transition active:scale-95"
+                                                        title="刪除隊伍"
+                                                    >
+                                                        <i className="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Squad Players Preview */}
+                                            <div className="flex flex-wrap gap-1.5 py-1">
+                                                {Object.values(team.slotSelections || {}).map(pid => {
+                                                    const pl = playerList.find(p => p.id === pid);
+                                                    const isCap = team.captainId === pid;
+                                                    return pl ? (
+                                                        <span key={pid} className={`text-[10px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 ${isCap ? 'bg-amber-400 text-slate-950' : 'bg-slate-900 text-slate-300 border border-slate-800'}`}>
+                                                            {pl.name} {isCap && '(C)'}
+                                                        </span>
+                                                    ) : null;
+                                                })}
+                                            </div>
+
+                                            {/* Chip Settlement Controls */}
+                                            {team.activeChip === 'desmond' && (
+                                                <div className="bg-purple-950/40 border border-purple-500/40 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                                                    <span className="font-bold text-purple-300">Desmond 勝負判定:</span>
+                                                    <div className="flex space-x-1">
+                                                        <button
+                                                            onClick={() => handleUpdateTeamChipOutcome(team, 'desmondResult', 'win')}
+                                                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition ${team.desmondResult === 'win' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400'}`}
+                                                        >
+                                                            勝出 (+3)
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleUpdateTeamChipOutcome(team, 'desmondResult', 'loss')}
+                                                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition ${team.desmondResult === 'loss' ? 'bg-red-500 text-white' : 'bg-slate-900 text-slate-400'}`}
+                                                        >
+                                                            落敗 (-3)
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleUpdateTeamChipOutcome(team, 'desmondResult', 'none')}
+                                                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition ${!team.desmondResult || team.desmondResult === 'none' ? 'bg-slate-800 text-slate-200' : 'bg-slate-900 text-slate-500'}`}
+                                                        >
+                                                            和局 (0)
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {team.activeChip === 'benjie' && (
+                                                <div className="bg-indigo-950/40 border border-indigo-500/40 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                                                    <span className="font-bold text-indigo-300">Benjie GK 保持不失球:</span>
+                                                    <button
+                                                        onClick={() => handleUpdateTeamChipOutcome(team, 'benjieCS', !team.benjieCS)}
+                                                        className={`px-3 py-1 rounded-lg text-xs font-extrabold transition ${team.benjieCS ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400'}`}
+                                                    >
+                                                        {team.benjieCS ? '成功 (+6分)' : '未達成 (0分)'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function PlayerApplication({ leagueState, updateLeagueState, showNotification, activeTab, setActiveTab }) {
+            const [selectedTeamId, setSelectedTeamId] = React.useState('NEW');
+            const [teamName, setTeamName] = React.useState('');
+            const [formation, setFormation] = React.useState('1-2-1');
+            const [slotSelections, setSlotSelections] = React.useState({});
+            const [captainId, setCaptainId] = React.useState(null);
+            const [activeChip, setActiveChip] = React.useState('none');
+            const [usedChips, setUsedChips] = React.useState([]);
+            const [activePickerSlot, setActivePickerSlot] = React.useState(null);
+            const [searchQuery, setSearchQuery] = React.useState('');
+            const [selectedTeamDetail, setSelectedTeamDetail] = React.useState(null);
+            const [isLocked, setIsLocked] = React.useState(false);
+            const [statsFilterPos, setStatsFilterPos] = React.useState('ALL');
+
+            const playerList = leagueState.playerCatalog || DEFAULT_PLAYERS;
+            const currentGw = leagueState.currentGameweek || 1;
+            const allTeams = leagueState.teams || [];
+
+            // Check deadline lock dynamically based on current time and deadline
+            React.useEffect(() => {
+                let locked = false;
+                if (leagueState.deadline) {
+                    const dlTime = new Date(leagueState.deadline).getTime();
+                    if (!isNaN(dlTime) && Date.now() > dlTime) {
+                        locked = true;
+                    }
+                }
+                setIsLocked(locked);
+            }, [leagueState.deadline, leagueState.currentGameweek]);
+
+            // Handle Team Selection Dropdown change
+            const handleSelectTeamToEdit = (teamId) => {
+                setSelectedTeamId(teamId);
+                if (teamId === 'NEW') {
+                    setTeamName('');
+                    setFormation('1-2-1');
+                    setSlotSelections({});
+                    setCaptainId(null);
+                    setActiveChip('none');
+                    setUsedChips([]);
+                } else {
+                    const target = allTeams.find(t => t.id === teamId);
+                    if (target) {
+                        setTeamName(target.teamName || '');
+                        setFormation(target.formation || '1-2-1');
+                        setSlotSelections(target.slotSelections || {});
+                        setCaptainId(target.captainId || null);
+                        setActiveChip(target.activeChip || 'none');
+                        setUsedChips(target.usedChips || []);
+                    }
+                }
+            };
+
+            const totalBudgetSpent = Object.values(slotSelections).reduce((sum, pid) => {
+                const player = playerList.find(p => p.id === pid);
+                return sum + (player ? player.price : 0);
+            }, 0);
+
+            const isOverBudget = totalBudgetSpent > 18.0;
+
+            const handleSlotSelectPlayer = (player) => {
+                if (isLocked) {
+                    showNotification('🔒 已過截止時間，陣容已鎖定！');
+                    return;
+                }
+                if (!activePickerSlot) return;
+
+                if (player.position !== activePickerSlot.pos) {
+                    showNotification(`⚠️ 此位置只能選擇 ${activePickerSlot.pos} (後衛/中場/前鋒) 球員！`);
+                    return;
+                }
+
+                // Remove player if selected in another slot
+                const newSelections = { ...slotSelections };
+                Object.keys(newSelections).forEach(k => {
+                    if (newSelections[k] === player.id) {
+                        delete newSelections[k];
+                    }
+                });
+
+                newSelections[activePickerSlot.key] = player.id;
+                setSlotSelections(newSelections);
+
+                if (!captainId) {
+                    setCaptainId(player.id);
+                }
+
+                setActivePickerSlot(null);
+            };
+
+            const handleSaveTeam = () => {
+                if (!teamName.trim()) {
+                    showNotification('⚠️ 請輸入隊伍名稱！');
+                    return;
+                }
+
+                const currentSlots = FORMATIONS[formation] || [];
+                const pickedCount = currentSlots.filter(s => slotSelections[s.key]).length;
+
+                if (pickedCount < 4) {
+                    showNotification('⚠️ 請選滿 4 位球員！');
+                    return;
+                }
+
+                if (isOverBudget) {
+                    showNotification('⚠️ 總金額超出 £18.0m 預算限制！');
+                    return;
+                }
+
+                if (!captainId) {
+                    showNotification('⚠️ 請指定一位隊長 (Captain)！');
+                    return;
+                }
+
+                // Prevent saving a chip that has already been consumed
+                if (activeChip !== 'none' && usedChips.includes(activeChip)) {
+                    showNotification(`⚠️ 特權卡「${activeChip}」已於過去輪次使用過，每張特權卡全季僅限使用一次！`);
+                    return;
+                }
+
+                // Check if existing team matched by ID or by Name
+                let targetTeamId = selectedTeamId;
+                if (targetTeamId === 'NEW') {
+                    const existingByName = allTeams.find(t => t.teamName.trim().toLowerCase() === teamName.trim().toLowerCase());
+                    if (existingByName) {
+                        targetTeamId = existingByName.id;
+                    } else {
+                        targetTeamId = 'team_' + Date.now();
+                    }
+                }
+
+                const existingTeamObj = allTeams.find(t => t.id === targetTeamId);
+
+                const teamObj = {
+                    id: targetTeamId,
+                    teamName: teamName.trim(),
+                    formation,
+                    slotSelections,
+                    captainId,
+                    activeChip,
+                    usedChips: existingTeamObj ? (existingTeamObj.usedChips || usedChips) : usedChips,
+                    gameweek: currentGw,
+                    cumulativePoints: existingTeamObj ? (existingTeamObj.cumulativePoints || 0) : 0,
+                    updatedAt: Date.now()
+                };
+
+                const existingIdx = allTeams.findIndex(t => t.id === targetTeamId);
+                let updatedTeams;
+                if (existingIdx >= 0) {
+                    updatedTeams = allTeams.map(t => t.id === targetTeamId ? { ...t, ...teamObj } : t);
+                } else {
+                    updatedTeams = [...allTeams, teamObj];
+                }
+
+                updateLeagueState({ teams: updatedTeams });
+                setSelectedTeamId(targetTeamId);
+                showNotification(`🎉 隊伍「${teamName.trim()}」已成功儲存至聯賽！`);
+            };
+
+            const currentSlots = FORMATIONS[formation] || [];
+            const sortedLeaderboard = [...allTeams].sort((a, b) => {
+                const ptsA = (a.cumulativePoints || 0) + calculateTeamTotalPoints(a, leagueState.playerStats || {}, playerList);
+                const ptsB = (b.cumulativePoints || 0) + calculateTeamTotalPoints(b, leagueState.playerStats || {}, playerList);
+                return ptsB - ptsA;
+            });
+
+            return (
+                <div className="flex-1 flex flex-col overflow-y-auto">
+                    {/* Announcement Banner */}
+                    {leagueState.announcement && (
+                        <div className="bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black px-4 py-2 text-xs flex items-center gap-2 shadow-md">
+                            <i className="fas fa-bullhorn animate-bounce text-slate-950"></i>
+                            <span className="truncate">{leagueState.announcement}</span>
+                        </div>
+                    )}
+
+                    {/* Deadline Status Banner */}
+                    <div className={`px-4 py-1.5 text-[11px] font-extrabold flex items-center justify-between border-b ${isLocked ? 'bg-red-950/80 text-red-300 border-red-800' : 'bg-slate-900 text-slate-300 border-slate-800'}`}>
+                        <div className="flex items-center gap-2">
+                            <i className={`fas ${isLocked ? 'fa-lock text-red-400' : 'fa-clock text-amber-400'}`}></i>
+                            <span>GW{currentGw} 截止狀態: {isLocked ? '🔒 已截止鎖定' : '🔓 開放修改中'}</span>
+                        </div>
+                        {leagueState.deadline && (
+                            <span className="text-[10px] opacity-80">
+                                {new Date(leagueState.deadline).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Pitch / My Squad View */}
+                    {activeTab === 'squad' && (
+                        <div className="p-3.5 space-y-4 pb-12">
+                            {/* Team Header Config */}
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-3 shadow-lg">
+                                {/* Shared Device Team Switcher */}
+                                <div>
+                                    <label className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
+                                        <i className="fas fa-users mr-1"></i>選擇或創建隊伍 (Select Team):
+                                    </label>
+                                    <select
+                                        value={selectedTeamId}
+                                        onChange={(e) => handleSelectTeamToEdit(e.target.value)}
+                                        className="w-full bg-slate-950 border border-amber-500/50 rounded-xl px-3 py-2 text-xs font-black text-amber-300 focus:outline-none focus:border-amber-400 mb-2"
+                                    >
+                                        <option value="NEW">➕ [-- 建立新隊伍 Create New Team --]</option>
+                                        {allTeams.map(t => (
+                                            <option key={t.id} value={t.id}>
+                                                ⚽ {t.teamName} (已選 {Object.keys(t.slotSelections || {}).length}/4 人)
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">隊伍名稱 (Team Name)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="輸入你的球隊名字..."
+                                        disabled={isLocked}
+                                        value={teamName}
+                                        onChange={(e) => setTeamName(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-black text-white focus:outline-none focus:border-amber-400 disabled:opacity-60"
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-between pt-1">
+                                    <div className="flex items-center space-x-1">
+                                        <span className="text-[10px] font-bold text-slate-400 mr-1">陣型:</span>
+                                        {Object.keys(FORMATIONS).map(f => (
+                                            <button
+                                                key={f}
+                                                disabled={isLocked}
+                                                onClick={() => {
+                                                    setFormation(f);
+                                                    setSlotSelections({});
+                                                    setCaptainId(null);
+                                                }}
+                                                className={`px-2.5 py-1 rounded-lg text-xs font-black transition ${formation === f ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400 border border-slate-800'} disabled:opacity-60`}
+                                            >
+                                                {f}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Budget Indicator */}
+                                    <div className="text-right">
+                                        <div className="text-[9px] font-extrabold text-slate-400">剩餘預算</div>
+                                        <div className={`text-xs font-black ${isOverBudget ? 'text-red-400' : 'text-[#00ff87]'}`}>
+                                            £{(18.0 - totalBudgetSpent).toFixed(1)}m / £18.0m
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Pitch Visualizer */}
+                            <div className="relative rounded-2xl overflow-hidden shadow-2xl border-2 border-emerald-600/50 fpl-pitch-stripes min-h-[360px] flex flex-col justify-around items-center p-4">
+                                {/* Pitch Overlay Markings */}
+                                <div className="absolute inset-x-8 top-0 h-16 border-b-2 border-x-2 border-white/20 rounded-b-xl pointer-events-none"></div>
+                                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 bg-white/20 pointer-events-none"></div>
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/20 rounded-full pointer-events-none"></div>
+
+                                {/* Dynamic Formation Slots */}
+                                {formation === '1-2-1' && (
+                                    <React.Fragment>
+                                        <div className="flex justify-center z-10 w-full">
+                                            {currentSlots.filter(s => s.pos === 'ATT').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-around z-10 w-full px-2">
+                                            {currentSlots.filter(s => s.pos === 'MID').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-center z-10 w-full">
+                                            {currentSlots.filter(s => s.pos === 'DEF').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                    </React.Fragment>
+                                )}
+
+                                {formation === '2-1-1' && (
+                                    <React.Fragment>
+                                        <div className="flex justify-center z-10 w-full">
+                                            {currentSlots.filter(s => s.pos === 'ATT').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-center z-10 w-full">
+                                            {currentSlots.filter(s => s.pos === 'MID').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-around z-10 w-full px-2">
+                                            {currentSlots.filter(s => s.pos === 'DEF').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                    </React.Fragment>
+                                )}
+
+                                {formation === '1-1-2' && (
+                                    <React.Fragment>
+                                        <div className="flex justify-around z-10 w-full px-2">
+                                            {currentSlots.filter(s => s.pos === 'ATT').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-center z-10 w-full">
+                                            {currentSlots.filter(s => s.pos === 'MID').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-center z-10 w-full">
+                                            {currentSlots.filter(s => s.pos === 'DEF').map(s => (
+                                                <RenderFplSlotCard key={s.key} slot={s} slotSelections={slotSelections} setCaptainId={setCaptainId} captainId={captainId} setActivePickerSlot={setActivePickerSlot} playerStats={leagueState.playerStats || {}} playerList={playerList} isLocked={isLocked} />
+                                            ))}
+                                        </div>
+                                    </React.Fragment>
+                                )}
+                            </div>
+
+                            {/* Chip Selection Card */}
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2 shadow-lg">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
+                                        選擇特權卡 (Active Chip - 每張全季限用一次)
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        disabled={isLocked}
+                                        onClick={() => setActiveChip('none')}
+                                        className={`p-2 rounded-xl text-xs font-black border transition ${activeChip === 'none' ? 'bg-slate-800 border-amber-400 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'} disabled:opacity-60`}
+                                    >
+                                        不使用
+                                    </button>
+                                    <button
+                                        disabled={isLocked || usedChips.includes('desmond')}
+                                        onClick={() => setActiveChip('desmond')}
+                                        className={`p-2 rounded-xl text-xs font-black border transition relative ${activeChip === 'desmond' ? 'bg-purple-950 border-purple-400 text-purple-300' : 'bg-slate-950 border-slate-800 text-slate-400'} ${usedChips.includes('desmond') ? 'opacity-40 line-through cursor-not-allowed' : ''} disabled:opacity-60`}
+                                    >
+                                        Desmond 勝負 (+3/-3) {usedChips.includes('desmond') && <span className="block text-[8px] text-red-400 no-underline font-extrabold">(已用)</span>}
+                                    </button>
+                                    <button
+                                        disabled={isLocked || usedChips.includes('benjie')}
+                                        onClick={() => setActiveChip('benjie')}
+                                        className={`p-2 rounded-xl text-xs font-black border transition relative ${activeChip === 'benjie' ? 'bg-indigo-950 border-indigo-400 text-indigo-300' : 'bg-slate-950 border-slate-800 text-slate-400'} ${usedChips.includes('benjie') ? 'opacity-40 line-through cursor-not-allowed' : ''} disabled:opacity-60`}
+                                    >
+                                        Benjie 不失球 (+6) {usedChips.includes('benjie') && <span className="block text-[8px] text-red-400 no-underline font-extrabold">(已用)</span>}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Save Team Button */}
+                            <button
+                                disabled={isLocked}
+                                onClick={handleSaveTeam}
+                                className="w-full bg-[#00ff87] hover:bg-[#00e077] text-slate-950 font-black py-3 rounded-2xl text-xs transition active:scale-95 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                <i className="fas fa-paper-plane"></i>
+                                {isLocked ? '陣容已被鎖定 (Locked)' : '提交 / 保存陣容 (Submit Team)'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Leaderboard View */}
+                    {activeTab === 'leaderboard' && (
+                        <div className="p-3.5 space-y-3 pb-12">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        <i className="fas fa-trophy text-amber-400"></i>
+                                        聯賽排行榜 (Gameweek {currentGw})
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-extrabold">{sortedLeaderboard.length} 隊參賽</span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {sortedLeaderboard.length === 0 ? (
+                                        <div className="text-center py-8 text-xs text-slate-500">暫無提交的陣容</div>
+                                    ) : (
+                                        sortedLeaderboard.map((t, idx) => {
+                                            const gwPts = calculateTeamTotalPoints(t, leagueState.playerStats || {}, playerList);
+                                            const cumulativeTotal = (t.cumulativePoints || 0) + gwPts;
+                                            return (
+                                                <div
+                                                    key={t.id}
+                                                    onClick={() => setSelectedTeamDetail(t)}
+                                                    className="bg-slate-950 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between hover:border-amber-400 cursor-pointer transition active:scale-98 shadow"
+                                                >
+                                                    <div className="flex items-center space-x-3">
+                                                        <span className={`w-6 h-6 rounded-lg font-black text-xs flex items-center justify-center ${idx === 0 ? 'bg-amber-400 text-slate-950' : idx === 1 ? 'bg-slate-300 text-slate-950' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                                                            {idx + 1}
+                                                        </span>
+                                                        <div>
+                                                            <div className="font-black text-xs text-white">{t.teamName}</div>
+                                                            <div className="text-[10px] text-slate-400">
+                                                                陣型: {t.formation} {t.activeChip !== 'none' && `• 特權: ${t.activeChip}`}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-right">
+                                                        <div className="text-xs font-black text-[#00ff87]">{cumulativeTotal} 分</div>
+                                                        <div className="text-[9px] text-slate-400 font-bold">今輪 +{gwPts}</div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Player Catalog & Stats View */}
+                    {activeTab === 'stats' && (
+                        <div className="p-3.5 space-y-3 pb-12">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
+                                        球員表現數據表
+                                    </span>
+                                    <div className="flex space-x-1">
+                                        {['ALL', 'DEF', 'MID', 'ATT'].map(pos => (
+                                            <button
+                                                key={pos}
+                                                onClick={() => setStatsFilterPos(pos)}
+                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border transition ${statsFilterPos === pos ? 'bg-amber-400 border-amber-400 text-slate-950' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                                            >
+                                                {pos}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                                    {playerList.filter(p => statsFilterPos === 'ALL' || p.position === statsFilterPos).map(p => {
+                                        const st = (leagueState.playerStats || {})[p.id] || {};
+                                        const pts = calculatePlayerPoints(p, st);
+                                        return (
+                                            <div key={p.id} className="bg-slate-950 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between">
+                                                <div className="flex items-center space-x-3">
+                                                    <span className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] ${p.position === 'DEF' ? 'bg-purple-950 text-purple-300 border border-purple-500/40' : p.position === 'MID' ? 'bg-blue-950 text-blue-300 border border-blue-500/40' : 'bg-red-950 text-red-300 border border-red-500/40'}`}>
+                                                        {p.position}
+                                                    </span>
+                                                    <div>
+                                                        <div className="font-extrabold text-xs text-white">{p.name}</div>
+                                                        <div className="text-[9px] text-slate-400">
+                                                            {st.minutes || 0}分鐘 • {st.goals || 0}G {st.assists || 0}A {st.cleanSheet ? '• CS' : ''} {st.yellowCards ? `• 🟨${st.yellowCards}` : ''} {st.redCards ? `• 🟥${st.redCards}` : ''}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-right">
+                                                    <div className="text-xs font-black text-[#00ff87]">{pts} 分</div>
+                                                    <div className="text-[10px] text-slate-400 font-bold">£{p.price.toFixed(1)}m</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Slot Picker Modal */}
+                    {activePickerSlot && (
+                        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-200">
+                            <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 space-y-3 max-h-[85vh] flex flex-col shadow-2xl">
+                                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                    <span className="font-black text-sm text-white">選擇球員 ({activePickerSlot.label})</span>
+                                    <button onClick={() => setActivePickerSlot(null)} className="text-slate-400 text-sm font-bold">
+                                        <i className="fas fa-xmark text-lg"></i>
+                                    </button>
+                                </div>
+
+                                <input
+                                    type="text"
+                                    placeholder="搜尋球員名字..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400"
+                                />
+
+                                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                    {playerList
+                                        .filter(p => p.position === activePickerSlot.pos)
+                                        .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                        .map(p => {
+                                            const isAlreadyPicked = Object.values(slotSelections).includes(p.id);
+                                            return (
+                                                <div
+                                                    key={p.id}
+                                                    onClick={() => handleSlotSelectPlayer(p)}
+                                                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition active:scale-98 ${isAlreadyPicked ? 'bg-amber-950/40 border-amber-500/50' : 'bg-slate-950 border-slate-800/80 hover:border-slate-600'}`}
+                                                >
+                                                    <div>
+                                                        <div className="font-extrabold text-xs text-white">{p.name}</div>
+                                                        <div className="text-[10px] text-slate-400">身價: £{p.price.toFixed(1)}m</div>
+                                                    </div>
+                                                    {isAlreadyPicked ? (
+                                                        <span className="text-[10px] font-black bg-amber-400 text-slate-950 px-2 py-0.5 rounded">已選擇</span>
+                                                    ) : (
+                                                        <button className="text-[10px] font-black bg-slate-800 hover:bg-amber-400 hover:text-slate-950 text-slate-200 px-3 py-1 rounded-lg transition">選擇</button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Team Detail Modal */}
+                    {selectedTeamDetail && (
+                        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-4 space-y-3 shadow-2xl">
+                                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                    <div>
+                                        <div className="font-black text-sm text-white">{selectedTeamDetail.teamName}</div>
+                                        <div className="text-[10px] text-slate-400">陣型: {selectedTeamDetail.formation}</div>
+                                    </div>
+                                    <button onClick={() => setSelectedTeamDetail(null)} className="text-slate-400">
+                                        <i className="fas fa-xmark text-lg"></i>
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {Object.values(selectedTeamDetail.slotSelections || {}).map(pid => {
+                                        const player = playerList.find(p => p.id === pid);
+                                        if (!player) return null;
+                                        const isCap = selectedTeamDetail.captainId === pid;
+                                        const pStat = (leagueState.playerStats || {})[pid] || {};
+                                        const pts = calculatePlayerPoints(player, pStat) * (isCap ? 2 : 1);
+                                        return (
+                                            <div key={pid} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                                                <div className="flex items-center space-x-2">
+                                                    <span className={`w-5 h-5 rounded font-black text-[9px] flex items-center justify-center ${player.position === 'DEF' ? 'bg-purple-950 text-purple-300' : player.position === 'MID' ? 'bg-blue-950 text-blue-300' : 'bg-red-950 text-red-300'}`}>
+                                                        {player.position}
+                                                    </span>
+                                                    <span className="font-bold text-white">{player.name} {isCap && '(C)'}</span>
+                                                </div>
+                                                <span className="font-black text-[#00ff87]">{pts} 分</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <button
+                                    onClick={() => setSelectedTeamDetail(null)}
+                                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-black py-2.5 rounded-xl text-xs"
+                                >
+                                    關閉
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function UnifiedApp() {
+            const [currentMode, setCurrentMode] = React.useState('player'); // 'player' | 'admin'
+            const [playerActiveTab, setPlayerActiveTab] = React.useState('squad'); // 'squad' | 'leaderboard' | 'stats'
+            const [adminActiveTab, setAdminActiveTab] = React.useState('settings'); // 'settings' | 'catalog' | 'stats' | 'teams'
+            const [notification, setNotification] = React.useState(null);
+            const [modalConfig, setModalConfig] = React.useState(null);
+
+            const [isAdminAuthenticated, setIsAdminAuthenticated] = React.useState(false);
+            const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
+            const [passwordInput, setPasswordInput] = React.useState('');
+            const [isCloudConnected, setIsCloudConnected] = React.useState(false);
+
+            const [leagueState, setLeagueState] = React.useState(() => {
+                const saved = localStorage.getItem('fpl_league_state');
+                return saved ? JSON.parse(saved) : {
+                    teams: [],
+                    playerStats: {},
+                    announcement: '',
+                    playerCatalog: DEFAULT_PLAYERS,
+                    deadline: null,
+                    currentGameweek: 1,
+                    teamHistory: {}
+                };
+            });
+
+            const broadcastChannelRef = React.useRef(null);
+
+            React.useEffect(() => {
+                // Register Cloud Sync event handlers
+                window.handleRemoteLeagueState = (remoteState) => {
+                    if (remoteState) {
+                        setLeagueState(remoteState);
+                        localStorage.setItem('fpl_league_state', JSON.stringify(remoteState));
+                    }
+                };
+
+                window.onCloudStatusChange = (status) => {
+                    setIsCloudConnected(status);
+                };
+
+                // Broadcast Channel fallback for multiple local tabs
+                try {
+                    broadcastChannelRef.current = new BroadcastChannel('fpl_sync_channel');
+                    broadcastChannelRef.current.onmessage = (event) => {
+                        if (event.data) {
+                            setLeagueState(event.data);
+                        }
+                    };
+                } catch(e) {
+                    console.log('BroadcastChannel not supported');
+                }
+
+                return () => broadcastChannelRef.current?.close();
+            }, []);
+
+            const handleSwitchToAdmin = () => {
+                if (isAdminAuthenticated) {
+                    setCurrentMode('admin');
+                } else {
+                    setPasswordInput('');
+                    setIsPasswordModalOpen(true);
+                }
+            };
+
+            const handlePasswordSubmit = (e) => {
+                if (e) e.preventDefault();
+                if (passwordInput === '20211074') {
+                    setIsAdminAuthenticated(true);
+                    setCurrentMode('admin');
+                    setIsPasswordModalOpen(false);
+                    setPasswordInput('');
+                    showNotification('🔓 成功進入後台管理系統！');
+                } else {
+                    showNotification('❌ 密碼錯誤，請重新輸入！');
+                    setPasswordInput('');
+                }
+            };
+
+            const updateLeagueState = (partialState) => {
+                setLeagueState(prev => {
+                    const newState = { ...prev, ...partialState, _lastUpdated: Date.now() };
+                    localStorage.setItem('fpl_league_state', JSON.stringify(newState));
+                    
+                    // Broadcast to tabs
+                    broadcastChannelRef.current?.postMessage(newState);
+                    
+                    // Trigger Firebase Cloud Save
+                    if (window.saveLeagueStateToCloud) {
+                        window.saveLeagueStateToCloud(newState);
+                    }
+                    return newState;
+                });
+            };
+
+            const showNotification = (msg) => {
+                setNotification(msg);
+                setTimeout(() => setNotification(null), 3500);
+            };
+
+            const requestConfirmation = (config) => {
+                setModalConfig(config);
+            };
+
+            return (
+                <div className="w-full min-h-screen flex flex-col bg-slate-950 text-slate-100 relative">
+                    {/* Header */}
+                    <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md">
+                        <div className="flex items-center space-x-2">
+                            <span className="text-[#00ff87] font-black text-base tracking-wide flex items-center gap-1.5">
+                                <i className="fas fa-futbol text-[#00ff87]"></i>
+                                <span>18m FPL 4-A-Side</span>
+                            </span>
+                        </div>
+
+                        {/* Mode Toggle Switcher */}
+                        <div className="flex items-center space-x-2">
+                            <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex space-x-1">
+                                <button
+                                    onClick={() => setCurrentMode('player')}
+                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-1 ${currentMode === 'player' ? 'bg-[#00ff87] text-slate-950 shadow' : 'text-slate-400'}`}
+                                >
+                                    <i className="fas fa-gamepad"></i> 玩家
+                                </button>
+                                <button
+                                    onClick={handleSwitchToAdmin}
+                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-1 ${currentMode === 'admin' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-400'}`}
+                                >
+                                    <i className={`fas ${isAdminAuthenticated ? 'fa-crown' : 'fa-lock'}`}></i> 後台
+                                </button>
+                            </div>
+
+                            <span className={`text-[9px] font-black px-2 py-1 rounded-full border hidden sm:flex items-center gap-1 ${isCloudConnected ? 'bg-emerald-950 text-emerald-400 border-emerald-500/40' : 'bg-amber-950 text-amber-400 border-amber-500/40'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isCloudConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                                {isCloudConnected ? '☁️ 雲端同步' : '本地模式'}
+                            </span>
+                        </div>
+                    </div>
+
+                    {notification && (
+                        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-amber-400 text-slate-950 px-4 py-2.5 rounded-2xl shadow-2xl font-black text-xs border border-amber-300 animate-in fade-in zoom-in duration-200 text-center max-w-[90%]">
+                            {notification}
+                        </div>
+                    )}
+
+                    {/* Mode Specific Navigation Tabs Bar */}
+                    {currentMode === 'player' ? (
+                        <div className="bg-slate-900/90 border-b border-slate-800 p-2 grid grid-cols-3 gap-1">
+                            <button
+                                onClick={() => setPlayerActiveTab('squad')}
+                                className={`py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${playerActiveTab === 'squad' ? 'bg-[#00ff87] text-slate-950 shadow' : 'bg-slate-950 text-slate-400'}`}
+                            >
+                                <i className="fas fa-shirt"></i> 我的陣容
+                            </button>
+                            <button
+                                onClick={() => setPlayerActiveTab('leaderboard')}
+                                className={`py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${playerActiveTab === 'leaderboard' ? 'bg-[#00ff87] text-slate-950 shadow' : 'bg-slate-950 text-slate-400'}`}
+                            >
+                                <i className="fas fa-trophy"></i> 聯賽榜
+                            </button>
+                            <button
+                                onClick={() => setPlayerActiveTab('stats')}
+                                className={`py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 ${playerActiveTab === 'stats' ? 'bg-[#00ff87] text-slate-950 shadow' : 'bg-slate-950 text-slate-400'}`}
+                            >
+                                <i className="fas fa-chart-bar"></i> 球員數據
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="bg-slate-900/90 border-b border-slate-800 p-2 grid grid-cols-4 gap-1">
+                            <button
+                                onClick={() => setAdminActiveTab('settings')}
+                                className={`py-2 rounded-xl text-xs font-black transition flex flex-col items-center justify-center ${adminActiveTab === 'settings' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400'}`}
+                            >
+                                <i className="fas fa-sliders mb-0.5"></i>
+                                <span className="text-[10px]">設定/截止</span>
+                            </button>
+                            <button
+                                onClick={() => setAdminActiveTab('catalog')}
+                                className={`py-2 rounded-xl text-xs font-black transition flex flex-col items-center justify-center ${adminActiveTab === 'catalog' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400'}`}
+                            >
+                                <i className="fas fa-users mb-0.5"></i>
+                                <span className="text-[10px]">球員目錄</span>
+                            </button>
+                            <button
+                                onClick={() => setAdminActiveTab('stats')}
+                                className={`py-2 rounded-xl text-xs font-black transition flex flex-col items-center justify-center ${adminActiveTab === 'stats' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400'}`}
+                            >
+                                <i className="fas fa-clipboard-check mb-0.5"></i>
+                                <span className="text-[10px]">比賽錄入</span>
+                            </button>
+                            <button
+                                onClick={() => setAdminActiveTab('teams')}
+                                className={`py-2 rounded-xl text-xs font-black transition flex flex-col items-center justify-center ${adminActiveTab === 'teams' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400'}`}
+                            >
+                                <i className="fas fa-trophy mb-0.5"></i>
+                                <span className="text-[10px]">隊伍/特權</span>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* App View Content */}
+                    <div className="flex-1 overflow-y-auto pb-12">
+                        {currentMode === 'player' ? (
+                            <PlayerApplication
+                                leagueState={leagueState}
+                                updateLeagueState={updateLeagueState}
+                                showNotification={showNotification}
+                                activeTab={playerActiveTab}
+                                setActiveTab={setPlayerActiveTab}
+                            />
+                        ) : (
+                            <React.Fragment>
+                                {adminActiveTab === 'settings' && (
+                                    <LeagueSettingsTab
+                                        leagueState={leagueState}
+                                        updateLeagueState={updateLeagueState}
+                                        showNotification={showNotification}
+                                        requestConfirmation={requestConfirmation}
+                                    />
+                                )}
+                                {adminActiveTab === 'catalog' && (
+                                    <PlayerCatalogTab
+                                        leagueState={leagueState}
+                                        updateLeagueState={updateLeagueState}
+                                        showNotification={showNotification}
+                                    />
+                                )}
+                                {adminActiveTab === 'stats' && (
+                                    <StatsEntryTab
+                                        leagueState={leagueState}
+                                        updateLeagueState={updateLeagueState}
+                                        showNotification={showNotification}
+                                    />
+                                )}
+                                {adminActiveTab === 'teams' && (
+                                    <TeamsResolutionTab
+                                        leagueState={leagueState}
+                                        updateLeagueState={updateLeagueState}
+                                        showNotification={showNotification}
+                                        requestConfirmation={requestConfirmation}
+                                    />
+                                )}
+                            </React.Fragment>
+                        )}
+                    </div>
+
+                    {/* Password Entry Modal */}
+                    {isPasswordModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                            <form onSubmit={handlePasswordSubmit} className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2 text-amber-400">
+                                        <i className="fas fa-lock text-lg"></i>
+                                        <h3 className="font-black text-sm text-white">進入後台管理員驗證</h3>
+                                    </div>
+                                    <button type="button" onClick={() => setIsPasswordModalOpen(false)} className="text-slate-400 hover:text-white">
+                                        <i className="fas fa-xmark"></i>
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-400 font-medium">請輸入管理員密碼以開啟聯賽設定、錄入數據及結算功能：</p>
+                                <input
+                                    type="password"
+                                    placeholder="輸入密碼"
+                                    value={passwordInput}
+                                    onChange={(e) => setPasswordInput(e.target.value)}
+                                    autoFocus
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-bold text-white focus:outline-none focus:border-amber-400"
+                                />
+                                <div className="flex space-x-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPasswordModalOpen(false)}
+                                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl text-xs transition active:scale-95"
+                                    >
+                                        取消
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-2.5 rounded-xl text-xs transition active:scale-95"
+                                    >
+                                        解鎖進入
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* Confirmation Dialog */}
+                    <ConfirmationModal config={modalConfig} onClose={() => setModalConfig(null)} />
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<UnifiedApp />);
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fpl-tracker-app';
+        let db = null;
+        let auth = null;
+        let isCloudReady = false;
+
+        async function initCloudSync() {
+            try {
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    console.warn('Firebase config missing; running local offline mode.');
+                    if (window.onCloudStatusChange) window.onCloudStatusChange(false);
+                    return;
+                }
+
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                isCloudReady = true;
+                if (window.onCloudStatusChange) window.onCloudStatusChange(true);
+
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'league', 'state');
+
+                onSnapshot(docRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.data();
+                        if (data && data.leagueState && window.handleRemoteLeagueState) {
+                            window.handleRemoteLeagueState(data.leagueState);
+                        }
+                    }
+                }, (err) => {
+                    console.error('Firestore snapshot listener error:', err);
+                });
+
+            } catch (err) {
+                console.error('Firebase initialization error:', err);
+                if (window.onCloudStatusChange) window.onCloudStatusChange(false);
+            }
+        }
+
+        window.saveLeagueStateToCloud = async function(newState) {
+            if (!isCloudReady || !db) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'league', 'state');
+                await setDoc(docRef, { 
+                    leagueState: newState, 
+                    updatedAt: Date.now() 
+                }, { merge: true });
+            } catch (err) {
+                console.error('Error syncing league state to cloud:', err);
+            }
+        };
+
+        initCloudSync();
+    </script>
+</body>
+</html>
