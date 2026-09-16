@@ -1842,84 +1842,78 @@
     <!-- Firebase SDK Implementation -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
-        import { getDatabase, ref, set, onValue, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Configuration
+        // 1. Your specific Firebase Configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyBHCEBQ5UeCvKpu9BmTdC-mC3HaEUGiYhw",
-            authDomain: "pcms-75e2a.firebaseapp.com",
-            databaseURL: "https://pcms-75e2a-default-rtdb.firebaseio.com",
-            projectId: "pcms-75e2a",
-            storageBucket: "pcms-75e2a.firebasestorage.app",
-            messagingSenderId: "648765702228",
-            appId: "1:648765702228:web:9b1d637a520e4e2c2b2dc1",
-            measurementId: "G-ZGYQCCFXQ6"
+          apiKey: "AIzaSyBHCEBQ5UeCvKpu9BmTdC-mC3HaEUGiYhw",
+          authDomain: "pcms-75e2a.firebaseapp.com",
+          databaseURL: "https://pcms-75e2a-default-rtdb.firebaseio.com",
+          projectId: "pcms-75e2a",
+          storageBucket: "pcms-75e2a.firebasestorage.app",
+          messagingSenderId: "648765702228",
+          appId: "1:648765702228:web:9b1d637a520e4e2c2b2dc1",
+          measurementId: "G-ZGYQCCFXQ6"
         };
 
-        // Initialize Firebase Services
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-        const db = getDatabase(app);
+        let db = null;
+        let auth = null;
+        let isCloudReady = false;
 
-        // Firebase Realtime Database References
-        const leagueStateRef = ref(db, 'fpl_league/state');
-        const activeSessionsRef = ref(db, 'fpl_league/sessions/' + Date.now());
-
-        // Handle Site/Tab Close & Connection Status Tracking
-        onDisconnect(activeSessionsRef).set({
-            status: 'offline',
-            lastClosedAt: serverTimestamp()
-        });
-
-        set(activeSessionsRef, {
-            status: 'online',
-            connectedAt: serverTimestamp()
-        });
-
-        // Real-Time Database Listener: Updates UI across all clients when database changes
-        onValue(leagueStateRef, (snapshot) => {
-            if (snapshot.exists()) {
-                const remoteData = snapshot.val();
-                if (remoteData && window.handleRemoteLeagueState) {
-                    window.handleRemoteLeagueState(remoteData);
-                }
-            }
-            if (window.onCloudStatusChange) {
-                window.onCloudStatusChange(true);
-            }
-        }, (err) => {
-            console.error('Firebase Database Read Error:', err);
-            if (window.onCloudStatusChange) {
-                window.onCloudStatusChange(false);
-            }
-        });
-
-        // Write Function: Modify database on button click or state updates
-        window.saveLeagueStateToCloud = async function(newState) {
+        async function initCloudSync() {
             try {
-                await set(leagueStateRef, {
-                    ...newState,
-                    _lastSavedTimestamp: Date.now()
+                // Initialize Firebase
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Sign in anonymously so users don't need to log in to read/write data
+                await signInAnonymously(auth);
+
+                isCloudReady = true;
+                if (window.onCloudStatusChange) window.onCloudStatusChange(true);
+
+                // 2. Define the Document Path (Collection: 'fpl_league', Document: 'global_state')
+                const docRef = doc(db, 'fpl_league', 'global_state');
+
+                // 3. Listen for changes in real-time
+                onSnapshot(docRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.data();
+                        if (data && data.leagueState && window.handleRemoteLeagueState) {
+                            window.handleRemoteLeagueState(data.leagueState);
+                        }
+                    }
+                }, (err) => {
+                    console.error('Firestore snapshot listener error:', err);
                 });
+
             } catch (err) {
-                console.error('Error saving state to Firebase Realtime Database:', err);
+                console.error('Firebase initialization error:', err);
+                if (window.onCloudStatusChange) window.onCloudStatusChange(false);
+            }
+        }
+
+        // 4. Function to Save Data to Firestore
+        window.saveLeagueStateToCloud = async function(newState) {
+            if (!isCloudReady || !db) return;
+            try {
+                const docRef = doc(db, 'fpl_league', 'global_state');
+                
+                // Saving the document fields
+                await setDoc(docRef, { 
+                    leagueState: newState, 
+                    updatedAt: Date.now() 
+                }, { merge: true });
+                
+            } catch (err) {
+                console.error('Error syncing league state to cloud:', err);
             }
         };
 
-        // Window Close/Unload Handler: Record last exit timestamp
-        window.addEventListener('beforeunload', () => {
-            const savedState = localStorage.getItem('fpl_league_state');
-            if (savedState) {
-                try {
-                    const stateObj = JSON.parse(savedState);
-                    set(ref(db, 'fpl_league/last_closed'), {
-                        timestamp: Date.now(),
-                        currentGameweek: stateObj.currentGameweek || 1
-                    });
-                } catch(e) {}
-            }
-        });
+        // Run the initialization
+        initCloudSync();
     </script>
 </body>
 </html>
