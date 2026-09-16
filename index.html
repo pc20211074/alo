@@ -326,6 +326,7 @@
                     teamHist[currentGw] = { gwPoints: gwTotal, cumulative: newCumulative };
                     teamHistory[team.id] = teamHist;
 
+                    // Record chip usage into usedChips array
                     const prevUsedChips = team.usedChips || [];
                     const newUsedChips = (team.activeChip && team.activeChip !== 'none' && !prevUsedChips.includes(team.activeChip))
                         ? [...prevUsedChips, team.activeChip]
@@ -367,7 +368,7 @@
                     ...team,
                     cumulativePoints: 0,
                     lastGwPoints: 0,
-                    usedChips: [],
+                    usedChips: [], // Clear used chips back to GW1
                     activeChip: 'none',
                     desmondResult: 'none',
                     benjieCS: false
@@ -395,6 +396,7 @@
 
             return (
                 <div className="space-y-4 p-4">
+                    {/* Gameweek Finalize Control */}
                     <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/40 rounded-2xl p-4 space-y-3 shadow-xl">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
@@ -413,6 +415,7 @@
                         </button>
                     </div>
 
+                    {/* Broadcast Banner Control */}
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
@@ -443,6 +446,7 @@
                         </div>
                     </div>
 
+                    {/* Deadline Control */}
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
@@ -492,6 +496,7 @@
                         </div>
                     </div>
 
+                    {/* Reset to Gameweek 1 Control */}
                     <div className="bg-gradient-to-r from-red-950/60 to-slate-900 border border-red-500/40 rounded-2xl p-4 space-y-3 shadow-xl">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-red-400 uppercase tracking-wider flex items-center gap-2">
@@ -570,6 +575,7 @@
 
             return (
                 <div className="space-y-4 p-4">
+                    {/* Add / Edit Form */}
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
@@ -630,6 +636,7 @@
                         </button>
                     </div>
 
+                    {/* Catalog List */}
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
@@ -752,6 +759,7 @@
                             </button>
                         </div>
 
+                        {/* Player Picker */}
                         <div>
                             <label className="text-[11px] text-slate-400 font-bold block mb-1">選擇球員:</label>
                             <select
@@ -780,8 +788,10 @@
                             </div>
                         )}
 
+                        {/* Stats Form Controls */}
                         {currentPlayer && (
                             <div className="space-y-3 pt-2">
+                                {/* Minutes */}
                                 <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
                                     <span className="text-xs font-bold text-slate-300">上場時間 (分鐘, 滿40分+2pts)</span>
                                     <input
@@ -794,6 +804,7 @@
                                     />
                                 </div>
 
+                                {/* Goals */}
                                 <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
                                     <span className="text-xs font-bold text-slate-300">入球 (Goals)</span>
                                     <div className="flex items-center space-x-2">
@@ -803,6 +814,7 @@
                                     </div>
                                 </div>
 
+                                {/* Assists */}
                                 <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
                                     <span className="text-xs font-bold text-slate-300">助攻 (Assists +3pts)</span>
                                     <div className="flex items-center space-x-2">
@@ -812,6 +824,7 @@
                                     </div>
                                 </div>
 
+                                {/* Clean Sheet */}
                                 <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
                                     <span className="text-xs font-bold text-slate-300">不失球 (Clean Sheet)</span>
                                     <button
@@ -822,6 +835,7 @@
                                     </button>
                                 </div>
 
+                                {/* Cards & Penalties */}
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 flex justify-between items-center">
                                         <span className="text-[11px] font-bold text-yellow-400">黃牌 (-1pt)</span>
@@ -845,6 +859,7 @@
                                     </div>
                                 </div>
 
+                                {/* Bonus */}
                                 <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
                                     <span className="text-xs font-bold text-amber-300">額外紅利分 (Bonus Points)</span>
                                     <input
@@ -950,6 +965,7 @@
                                                 </div>
                                             </div>
 
+                                            {/* Squad Players Preview */}
                                             <div className="flex flex-wrap gap-1.5 py-1">
                                                 {Object.values(team.slotSelections || {}).map(pid => {
                                                     const pl = playerList.find(p => p.id === pid);
@@ -962,6 +978,7 @@
                                                 })}
                                             </div>
 
+                                            {/* Chip Settlement Controls */}
                                             {team.activeChip === 'desmond' && (
                                                 <div className="bg-purple-950/40 border border-purple-500/40 rounded-xl p-2.5 flex items-center justify-between text-xs">
                                                     <span className="font-bold text-purple-300">Desmond 勝負判定:</span>
@@ -1027,6 +1044,7 @@
             const currentGw = leagueState.currentGameweek || 1;
             const allTeams = leagueState.teams || [];
 
+            // Check deadline lock dynamically based on current time and deadline
             React.useEffect(() => {
                 let locked = false;
                 if (leagueState.deadline) {
@@ -1038,6 +1056,7 @@
                 setIsLocked(locked);
             }, [leagueState.deadline, leagueState.currentGameweek]);
 
+            // Handle Team Selection Dropdown change
             const handleSelectTeamToEdit = (teamId) => {
                 setSelectedTeamId(teamId);
                 if (teamId === 'NEW') {
@@ -1079,6 +1098,7 @@
                     return;
                 }
 
+                // Remove player if selected in another slot
                 const newSelections = { ...slotSelections };
                 Object.keys(newSelections).forEach(k => {
                     if (newSelections[k] === player.id) {
@@ -1120,11 +1140,13 @@
                     return;
                 }
 
+                // Prevent saving a chip that has already been consumed
                 if (activeChip !== 'none' && usedChips.includes(activeChip)) {
                     showNotification(`⚠️ 特權卡「${activeChip}」已於過去輪次使用過，每張特權卡全季僅限使用一次！`);
                     return;
                 }
 
+                // Check if existing team matched by ID or by Name
                 let targetTeamId = selectedTeamId;
                 if (targetTeamId === 'NEW') {
                     const existingByName = allTeams.find(t => t.teamName.trim().toLowerCase() === teamName.trim().toLowerCase());
@@ -1172,6 +1194,7 @@
 
             return (
                 <div className="flex-1 flex flex-col overflow-y-auto">
+                    {/* Announcement Banner */}
                     {leagueState.announcement && (
                         <div className="bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black px-4 py-2 text-xs flex items-center gap-2 shadow-md">
                             <i className="fas fa-bullhorn animate-bounce text-slate-950"></i>
@@ -1179,6 +1202,7 @@
                         </div>
                     )}
 
+                    {/* Deadline Status Banner */}
                     <div className={`px-4 py-1.5 text-[11px] font-extrabold flex items-center justify-between border-b ${isLocked ? 'bg-red-950/80 text-red-300 border-red-800' : 'bg-slate-900 text-slate-300 border-slate-800'}`}>
                         <div className="flex items-center gap-2">
                             <i className={`fas ${isLocked ? 'fa-lock text-red-400' : 'fa-clock text-amber-400'}`}></i>
@@ -1191,9 +1215,12 @@
                         )}
                     </div>
 
+                    {/* Pitch / My Squad View */}
                     {activeTab === 'squad' && (
                         <div className="p-3.5 space-y-4 pb-12">
+                            {/* Team Header Config */}
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-3 shadow-lg">
+                                {/* Shared Device Team Switcher */}
                                 <div>
                                     <label className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
                                         <i className="fas fa-users mr-1"></i>選擇或創建隊伍 (Select Team):
@@ -1243,6 +1270,7 @@
                                         ))}
                                     </div>
 
+                                    {/* Budget Indicator */}
                                     <div className="text-right">
                                         <div className="text-[9px] font-extrabold text-slate-400">剩餘預算</div>
                                         <div className={`text-xs font-black ${isOverBudget ? 'text-red-400' : 'text-[#00ff87]'}`}>
@@ -1252,11 +1280,14 @@
                                 </div>
                             </div>
 
+                            {/* Pitch Visualizer */}
                             <div className="relative rounded-2xl overflow-hidden shadow-2xl border-2 border-emerald-600/50 fpl-pitch-stripes min-h-[360px] flex flex-col justify-around items-center p-4">
+                                {/* Pitch Overlay Markings */}
                                 <div className="absolute inset-x-8 top-0 h-16 border-b-2 border-x-2 border-white/20 rounded-b-xl pointer-events-none"></div>
                                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 bg-white/20 pointer-events-none"></div>
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/20 rounded-full pointer-events-none"></div>
 
+                                {/* Dynamic Formation Slots */}
                                 {formation === '1-2-1' && (
                                     <React.Fragment>
                                         <div className="flex justify-center z-10 w-full">
@@ -1318,6 +1349,7 @@
                                 )}
                             </div>
 
+                            {/* Chip Selection Card */}
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2 shadow-lg">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
@@ -1349,6 +1381,7 @@
                                 </div>
                             </div>
 
+                            {/* Save Team Button */}
                             <button
                                 disabled={isLocked}
                                 onClick={handleSaveTeam}
@@ -1360,6 +1393,7 @@
                         </div>
                     )}
 
+                    {/* Leaderboard View */}
                     {activeTab === 'leaderboard' && (
                         <div className="p-3.5 space-y-3 pb-12">
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
@@ -1409,6 +1443,7 @@
                         </div>
                     )}
 
+                    {/* Player Catalog & Stats View */}
                     {activeTab === 'stats' && (
                         <div className="p-3.5 space-y-3 pb-12">
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
@@ -1459,6 +1494,7 @@
                         </div>
                     )}
 
+                    {/* Slot Picker Modal */}
                     {activePickerSlot && (
                         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-in fade-in duration-200">
                             <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-4 space-y-3 max-h-[85vh] flex flex-col shadow-2xl">
@@ -1506,6 +1542,7 @@
                         </div>
                     )}
 
+                    {/* Team Detail Modal */}
                     {selectedTeamDetail && (
                         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-4 space-y-3 shadow-2xl">
@@ -1554,9 +1591,9 @@
         }
 
         function UnifiedApp() {
-            const [currentMode, setCurrentMode] = React.useState('player');
-            const [playerActiveTab, setPlayerActiveTab] = React.useState('squad');
-            const [adminActiveTab, setAdminActiveTab] = React.useState('settings');
+            const [currentMode, setCurrentMode] = React.useState('player'); // 'player' | 'admin'
+            const [playerActiveTab, setPlayerActiveTab] = React.useState('squad'); // 'squad' | 'leaderboard' | 'stats'
+            const [adminActiveTab, setAdminActiveTab] = React.useState('settings'); // 'settings' | 'catalog' | 'stats' | 'teams'
             const [notification, setNotification] = React.useState(null);
             const [modalConfig, setModalConfig] = React.useState(null);
 
@@ -1581,6 +1618,7 @@
             const broadcastChannelRef = React.useRef(null);
 
             React.useEffect(() => {
+                // Register Cloud Sync event handlers
                 window.handleRemoteLeagueState = (remoteState) => {
                     if (remoteState) {
                         setLeagueState(remoteState);
@@ -1592,6 +1630,7 @@
                     setIsCloudConnected(status);
                 };
 
+                // Broadcast Channel fallback for multiple local tabs
                 try {
                     broadcastChannelRef.current = new BroadcastChannel('fpl_sync_channel');
                     broadcastChannelRef.current.onmessage = (event) => {
@@ -1634,8 +1673,10 @@
                     const newState = { ...prev, ...partialState, _lastUpdated: Date.now() };
                     localStorage.setItem('fpl_league_state', JSON.stringify(newState));
                     
+                    // Broadcast to tabs
                     broadcastChannelRef.current?.postMessage(newState);
                     
+                    // Trigger Firebase Cloud Save
                     if (window.saveLeagueStateToCloud) {
                         window.saveLeagueStateToCloud(newState);
                     }
@@ -1654,6 +1695,7 @@
 
             return (
                 <div className="w-full min-h-screen flex flex-col bg-slate-950 text-slate-100 relative">
+                    {/* Header */}
                     <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md">
                         <div className="flex items-center space-x-2">
                             <span className="text-[#00ff87] font-black text-base tracking-wide flex items-center gap-1.5">
@@ -1662,6 +1704,7 @@
                             </span>
                         </div>
 
+                        {/* Mode Toggle Switcher */}
                         <div className="flex items-center space-x-2">
                             <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex space-x-1">
                                 <button
@@ -1691,6 +1734,7 @@
                         </div>
                     )}
 
+                    {/* Mode Specific Navigation Tabs Bar */}
                     {currentMode === 'player' ? (
                         <div className="bg-slate-900/90 border-b border-slate-800 p-2 grid grid-cols-3 gap-1">
                             <button
@@ -1745,6 +1789,7 @@
                         </div>
                     )}
 
+                    {/* App View Content */}
                     <div className="flex-1 overflow-y-auto pb-12">
                         {currentMode === 'player' ? (
                             <PlayerApplication
@@ -1790,6 +1835,7 @@
                         )}
                     </div>
 
+                    {/* Password Entry Modal */}
                     {isPasswordModalOpen && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
                             <form onSubmit={handlePasswordSubmit} className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
@@ -1830,6 +1876,7 @@
                         </div>
                     )}
 
+                    {/* Confirmation Dialog */}
                     <ConfirmationModal config={modalConfig} onClose={() => setModalConfig(null)} />
                 </div>
             );
@@ -1839,45 +1886,40 @@
         root.render(<UnifiedApp />);
     </script>
 
-    <!-- Firebase SDK Implementation -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 1. Your specific Firebase Configuration
-        const firebaseConfig = {
-          apiKey: "AIzaSyBHCEBQ5UeCvKpu9BmTdC-mC3HaEUGiYhw",
-          authDomain: "pcms-75e2a.firebaseapp.com",
-          databaseURL: "https://pcms-75e2a-default-rtdb.firebaseio.com",
-          projectId: "pcms-75e2a",
-          storageBucket: "pcms-75e2a.firebasestorage.app",
-          messagingSenderId: "648765702228",
-          appId: "1:648765702228:web:9b1d637a520e4e2c2b2dc1",
-          measurementId: "G-ZGYQCCFXQ6"
-        };
-
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fpl-tracker-app';
         let db = null;
         let auth = null;
         let isCloudReady = false;
 
         async function initCloudSync() {
             try {
-                // Initialize Firebase
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    console.warn('Firebase config missing; running local offline mode.');
+                    if (window.onCloudStatusChange) window.onCloudStatusChange(false);
+                    return;
+                }
+
+                const firebaseConfig = JSON.parse(__firebase_config);
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // Sign in anonymously so users don't need to log in to read/write data
-                await signInAnonymously(auth);
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
 
                 isCloudReady = true;
                 if (window.onCloudStatusChange) window.onCloudStatusChange(true);
 
-                // 2. Define the Document Path (Collection: 'fpl_league', Document: 'global_state')
-                const docRef = doc(db, 'fpl_league', 'global_state');
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'league', 'state');
 
-                // 3. Listen for changes in real-time
                 onSnapshot(docRef, (snapshot) => {
                     if (snapshot.exists()) {
                         const data = snapshot.data();
@@ -1895,25 +1937,22 @@
             }
         }
 
-        // 4. Function to Save Data to Firestore
         window.saveLeagueStateToCloud = async function(newState) {
             if (!isCloudReady || !db) return;
             try {
-                const docRef = doc(db, 'fpl_league', 'global_state');
-                
-                // Saving the document fields
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'league', 'state');
                 await setDoc(docRef, { 
                     leagueState: newState, 
                     updatedAt: Date.now() 
                 }, { merge: true });
-                
             } catch (err) {
                 console.error('Error syncing league state to cloud:', err);
             }
         };
 
-        // Run the initialization
         initCloudSync();
     </script>
+</body>
+</html>
 </body>
 </html>
