@@ -1887,70 +1887,109 @@
     </script>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// SDK Imports via CDN for browser compatibility
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+    import { getDatabase, ref, set, update, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fpl-tracker-app';
-        let db = null;
-        let auth = null;
-        let isCloudReady = false;
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBHCEBQ5UeCvKpu9BmTdC-mC3HaEUGiYhw",
+      authDomain: "pcms-75e2a.firebaseapp.com",
+      databaseURL: "https://pcms-75e2a-default-rtdb.firebaseio.com",
+      projectId: "pcms-75e2a",
+      storageBucket: "pcms-75e2a.firebasestorage.app",
+      messagingSenderId: "648765702228",
+      appId: "1:648765702228:web:9b1d637a520e4e2c2b2dc1",
+      measurementId: "G-ZGYQCCFXQ6"
+    };
 
-        async function initCloudSync() {
-            try {
-                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                    console.warn('Firebase config missing; running local offline mode.');
-                    if (window.onCloudStatusChange) window.onCloudStatusChange(false);
-                    return;
-                }
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = getDatabase(app);
 
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
+    // Generate or fetch a unique session Player ID
+    const playerId = "player_" + Math.floor(Math.random() * 10000);
+    document.getElementById("playerIdDisplay").innerText = playerId;
 
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+    // Local Game State
+    let gameState = {
+      score: 0,
+      level: 1,
+      isOnline: true,
+      lastUpdated: null
+    };
 
-                isCloudReady = true;
-                if (window.onCloudStatusChange) window.onCloudStatusChange(true);
+    // Database Reference for this player
+    const playerRef = ref(db, 'players/' + playerId);
 
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'league', 'state');
+    // Initial Record Creation
+    function initializePlayerRecord() {
+      gameState.lastUpdated = serverTimestamp();
+      set(playerRef, {
+        score: gameState.score,
+        level: gameState.level,
+        isOnline: true,
+        lastActive: serverTimestamp()
+      });
 
-                onSnapshot(docRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        const data = snapshot.data();
-                        if (data && data.leagueState && window.handleRemoteLeagueState) {
-                            window.handleRemoteLeagueState(data.leagueState);
-                        }
-                    }
-                }, (err) => {
-                    console.error('Firestore snapshot listener error:', err);
-                });
+      // Configure server-side auto-update on unexpected disconnect/window close
+      const onlineRef = ref(db, `players/${playerId}/isOnline`);
+      const lastActiveRef = ref(db, `players/${playerId}/lastActive`);
+      
+      onDisconnect(onlineRef).set(false);
+      onDisconnect(lastActiveRef).set(serverTimestamp());
+    }
 
-            } catch (err) {
-                console.error('Firebase initialization error:', err);
-                if (window.onCloudStatusChange) window.onCloudStatusChange(false);
-            }
-        }
+    // Update state to database on button clicks
+    function saveGameState(actionType) {
+      gameState.lastUpdated = new Date().toISOString();
+      
+      update(playerRef, {
+        score: gameState.score,
+        level: gameState.level,
+        lastActive: serverTimestamp()
+      })
+      .then(() => {
+        document.getElementById("statusMessage").innerText = `Saved successfully: ${actionType}`;
+      })
+      .catch((error) => {
+        console.error("Save error:", error);
+      });
+    }
 
-        window.saveLeagueStateToCloud = async function(newState) {
-            if (!isCloudReady || !db) return;
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'league', 'state');
-                await setDoc(docRef, { 
-                    leagueState: newState, 
-                    updatedAt: Date.now() 
-                }, { merge: true });
-            } catch (err) {
-                console.error('Error syncing league state to cloud:', err);
-            }
-        };
+    // UI Event Listeners
+    document.getElementById("scoreBtn").addEventListener("click", () => {
+      gameState.score += 10;
+      document.getElementById("scoreDisplay").innerText = gameState.score;
+      saveGameState("Point Gained");
+    });
 
-        initCloudSync();
+    document.getElementById("levelBtn").addEventListener("click", () => {
+      gameState.level += 1;
+      document.getElementById("levelDisplay").innerText = gameState.level;
+      saveGameState("Level Up");
+    });
+
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      saveGameState("Manual Save");
+    });
+
+    // Save final state when page loses visibility or closes
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        update(playerRef, {
+          score: gameState.score,
+          level: gameState.level,
+          isOnline: false,
+          lastActive: serverTimestamp()
+        });
+      }
+    });
+
+    // Run setup on load
+    initializePlayerRecord();
     </script>
 </body>
 </html>
