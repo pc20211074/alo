@@ -188,7 +188,7 @@
                 <!-- Gameweek End -->
                 <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
                     <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">1. 輪次結算 (Gameweek End)</span>
-                    <p class="text-[11px] text-slate-400">將當前輪次分數累加至總分、重置球員每場比賽表現，並推推進至下一輪 (GW + 1)。</p>
+                    <p class="text-[11px] text-slate-400">將當前輪次分數累加至總分、重置球員每場比賽表現，並推推進至下一輪 (GW + 1)。已使用的特權卡狀態將更變為「已使用」。</p>
                     <button onclick="adminEndGameweek()" class="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-2.5 rounded-xl text-xs transition">
                         <i class="fas fa-[#00ff87] fa-forward"></i> 結算當前輪次並推進至下輪
                     </button>
@@ -442,6 +442,9 @@
             showToast("⚠️ Firebase Auth 失敗");
         });
 
+        // Event listener to check chip statuses when team name changes
+        document.getElementById('teamNameInput')?.addEventListener('input', updateChipButtonsUI);
+
         // 1. Realtime Listener: 'players' Collection
         onSnapshot(collection(db, 'players'), (snapshot) => {
             const list = [];
@@ -464,6 +467,7 @@
             teamsStore = list;
             recalculateLeaderboard();
             renderAdminTeamsResolution();
+            updateChipButtonsUI();
         });
 
         // 3. Realtime Listener: 'settings/league'
@@ -561,6 +565,36 @@
             renderLeaderboard(sortedTeams);
         }
 
+        // Helper to update active chip buttons and disable used chips
+        function updateChipButtonsUI() {
+            const teamName = document.getElementById('teamNameInput')?.value.trim();
+            const existingTeam = teamsStore.find(t => t.id === teamName);
+
+            const btnDesmond = document.getElementById('chipBtnDesmond');
+            const btnBenjie = document.getElementById('chipBtnBenjie');
+
+            const desmondUsed = existingTeam?.desmond === 'used';
+            const benjieUsed = existingTeam?.benjie === 'used';
+
+            if (btnDesmond) {
+                btnDesmond.disabled = desmondUsed;
+                btnDesmond.innerText = desmondUsed ? 'Desmond (已使用)' : 'Desmond (+3/-3)';
+                if (desmondUsed && activeChip === 'desmond') {
+                    activeChip = 'none';
+                }
+            }
+
+            if (btnBenjie) {
+                btnBenjie.disabled = benjieUsed;
+                btnBenjie.innerText = benjieUsed ? 'Benjie CS (已使用)' : 'Benjie CS (+6)';
+                if (benjieUsed && activeChip === 'benjie') {
+                    activeChip = 'none';
+                }
+            }
+
+            setChip(activeChip);
+        }
+
         // UI Handlers & Tab Switching
         window.switchTab = function(tabName) {
             document.getElementById('tabSquad').classList.add('hidden');
@@ -602,10 +636,47 @@
         };
 
         window.setChip = function(chip) {
+            const teamName = document.getElementById('teamNameInput')?.value.trim();
+            const existingTeam = teamsStore.find(t => t.id === teamName);
+
+            // Prevent selection if chip state is used
+            if (chip === 'desmond' && existingTeam?.desmond === 'used') return;
+            if (chip === 'benjie' && existingTeam?.benjie === 'used') return;
+
             activeChip = chip;
-            document.getElementById('chipBtnNone').className = chip === 'none' ? "p-2 rounded-xl text-xs font-black border transition bg-slate-800 border-amber-400 text-white" : "p-2 rounded-xl text-xs font-black border transition bg-slate-950 border-slate-800 text-slate-400";
-            document.getElementById('chipBtnDesmond').className = chip === 'desmond' ? "p-2 rounded-xl text-xs font-black border transition bg-purple-950 border-purple-400 text-purple-300" : "p-2 rounded-xl text-xs font-black border transition bg-slate-950 border-slate-800 text-slate-400";
-            document.getElementById('chipBtnBenjie').className = chip === 'benjie' ? "p-2 rounded-xl text-xs font-black border transition bg-indigo-950 border-indigo-400 text-indigo-300" : "p-2 rounded-xl text-xs font-black border transition bg-slate-950 border-slate-800 text-slate-400";
+
+            const btnNone = document.getElementById('chipBtnNone');
+            const btnDesmond = document.getElementById('chipBtnDesmond');
+            const btnBenjie = document.getElementById('chipBtnBenjie');
+
+            const desmondUsed = existingTeam?.desmond === 'used';
+            const benjieUsed = existingTeam?.benjie === 'used';
+
+            if (btnNone) {
+                btnNone.className = chip === 'none' 
+                    ? "p-2 rounded-xl text-xs font-black border transition bg-slate-800 border-amber-400 text-white" 
+                    : "p-2 rounded-xl text-xs font-black border transition bg-slate-950 border-slate-800 text-slate-400";
+            }
+
+            if (btnDesmond) {
+                if (desmondUsed) {
+                    btnDesmond.className = "p-2 rounded-xl text-xs font-black border transition bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed opacity-50";
+                } else if (chip === 'desmond') {
+                    btnDesmond.className = "p-2 rounded-xl text-xs font-black border transition bg-purple-950 border-purple-400 text-purple-300";
+                } else {
+                    btnDesmond.className = "p-2 rounded-xl text-xs font-black border transition bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700";
+                }
+            }
+
+            if (btnBenjie) {
+                if (benjieUsed) {
+                    btnBenjie.className = "p-2 rounded-xl text-xs font-black border transition bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed opacity-50";
+                } else if (chip === 'benjie') {
+                    btnBenjie.className = "p-2 rounded-xl text-xs font-black border transition bg-indigo-950 border-indigo-400 text-indigo-300";
+                } else {
+                    btnBenjie.className = "p-2 rounded-xl text-xs font-black border transition bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700";
+                }
+            }
         };
 
         window.openPickerModal = function(slotIndex) {
@@ -915,7 +986,7 @@
             if (!confirm("確定要結算當前輪次？這將會把每隊本輪分數永久計入總分，重置每場比賽數據，並推進至下一輪！")) return;
 
             try {
-                // 1. Commit live scores to accumulated points
+                // 1. Commit live scores to accumulated points and mark active chips as 'used'
                 for (let t of teamsStore) {
                     const liveGw = calculateTeamGwScore(t);
                     const newTotal = (t.points || 0) + liveGw;
