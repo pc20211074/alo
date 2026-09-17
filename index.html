@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>18m Budget 4-A-Side FPL Tracker</title>
+    <title>18m Budget 4-A-Side FPL Tracker & Admin Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -13,7 +13,7 @@
 
     <style>
         * { -webkit-tap-highlight-color: transparent; user-select: none; }
-        input, select { user-select: auto; }
+        input, select, textarea { user-select: auto; }
         body { font-family: 'Inter', sans-serif; background-color: #070a10; color: #f0f6fc; }
         .fpl-pitch-stripes {
             background: repeating-linear-gradient(
@@ -24,29 +24,57 @@
                 #006e3f 64px
             );
         }
+        @keyframes scrollText {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+            display: inline-block;
+            white-space: nowrap;
+            animation: scrollText 16s linear infinite;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-start p-0 sm:p-4 selection:bg-purple-500 selection:text-white antialiased">
 
     <div class="w-full max-w-md sm:max-w-2xl mx-auto min-h-screen flex flex-col relative bg-slate-950 shadow-2xl sm:rounded-3xl sm:border sm:border-slate-800 overflow-hidden">
         
+        <!-- Live Scrolling Announcement Banner -->
+        <div id="announcementContainer" class="hidden bg-amber-400 text-slate-950 px-3 py-1 font-black text-xs overflow-hidden relative flex items-center border-b border-amber-300">
+            <i class="fas fa-bullhorn mr-2 shrink-0"></i>
+            <div class="overflow-hidden w-full relative">
+                <span id="announcementText" class="animate-marquee"></span>
+            </div>
+        </div>
+
         <!-- Header -->
         <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md">
             <span class="text-[#00ff87] font-black text-base tracking-wide flex items-center gap-1.5">
                 <i class="fas fa-futbol"></i>
-                <span>18m FPL 4-A-Side</span>
+                <span>18m FPL 4-A-Side <span id="headerGwBadge" class="text-xs text-amber-400 font-extrabold">(GW1)</span></span>
             </span>
-            <div id="cloudStatus" class="text-[10px] font-black px-2.5 py-1 rounded-full border bg-amber-950 text-amber-400 border-amber-500/40 flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                <span id="cloudStatusText">連接雲端中...</span>
+            <div class="flex items-center space-x-2">
+                <button onclick="openAdminModal()" class="text-[11px] font-black px-2.5 py-1 rounded-xl bg-purple-950 border border-purple-500/50 text-purple-300 hover:bg-purple-900 transition flex items-center gap-1">
+                    <i class="fas fa-user-shield"></i> 管理員
+                </button>
+                <div id="cloudStatus" class="text-[10px] font-black px-2.5 py-1 rounded-full border bg-amber-950 text-amber-400 border-amber-500/40 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    <span id="cloudStatusText">連接中...</span>
+                </div>
             </div>
         </header>
 
         <!-- Notification Toast -->
         <div id="toast" class="hidden fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-amber-400 text-slate-950 px-4 py-2.5 rounded-2xl shadow-2xl font-black text-xs border border-amber-300 text-center max-w-[90%]"></div>
 
+        <!-- Deadline Alert Bar -->
+        <div id="deadlineBanner" class="bg-slate-900/90 border-b border-slate-800 px-4 py-1.5 flex items-center justify-between text-[11px] font-bold text-slate-300">
+            <span class="flex items-center gap-1"><i class="far fa-clock text-amber-400"></i> 提交截止時間:</span>
+            <span id="deadlineDisplayText" class="font-black text-amber-400">未設定</span>
+        </div>
+
         <!-- Navigation Tabs -->
-        <nav class="bg-slate-900/90 border-b border-slate-800 p-2 grid grid-cols-3 gap-1">
+        <nav id="userNav" class="bg-slate-900 border-b border-slate-800 p-2 grid grid-cols-3 gap-1">
             <button id="btnTabSquad" onclick="switchTab('squad')" class="py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 bg-[#00ff87] text-slate-950 shadow">
                 <i class="fas fa-shirt"></i> 我的陣容
             </button>
@@ -58,9 +86,8 @@
             </button>
         </nav>
 
-        <!-- TAB 1: SQUAD BUILDER -->
+        <!-- USER TAB 1: SQUAD BUILDER -->
         <section id="tabSquad" class="p-3.5 space-y-4 pb-12 flex-1 overflow-y-auto">
-            <!-- Team Config Card -->
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-3 shadow-lg">
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 block mb-1">隊伍名稱 (Team Name / Firestore Doc ID)</label>
@@ -88,9 +115,7 @@
                 <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 bg-white/20 pointer-events-none"></div>
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/20 rounded-full pointer-events-none"></div>
 
-                <div id="pitchSlotsContainer" class="w-full flex flex-col justify-around h-full min-h-[320px] z-10 space-y-4">
-                    <!-- Dynamic Pitch Slots Generated via JS -->
-                </div>
+                <div id="pitchSlotsContainer" class="w-full flex flex-col justify-around h-full min-h-[320px] z-10 space-y-4"></div>
             </div>
 
             <!-- Active Chips Section -->
@@ -103,13 +128,12 @@
                 </div>
             </div>
 
-            <!-- Submit Button -->
-            <button onclick="handleTeamSubmit()" class="w-full bg-[#00ff87] hover:bg-[#00e077] text-slate-950 font-black py-3.5 rounded-2xl text-xs transition active:scale-95 shadow-xl flex items-center justify-center gap-2">
-                <i class="fas fa-paper-plane"></i> 提交 / 更新陣容 (Submit to Firestore)
+            <button id="btnSubmitTeam" onclick="handleTeamSubmit()" class="w-full bg-[#00ff87] hover:bg-[#00e077] text-slate-950 font-black py-3.5 rounded-2xl text-xs transition active:scale-95 shadow-xl flex items-center justify-center gap-2">
+                <i class="fas fa-paper-plane"></i> 提交 / 更新陣容
             </button>
         </section>
 
-        <!-- TAB 2: LEADERBOARD -->
+        <!-- USER TAB 2: LEADERBOARD -->
         <section id="tabLeaderboard" class="p-3.5 space-y-3 pb-12 flex-1 overflow-y-auto hidden">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
                 <div class="flex items-center justify-between">
@@ -119,16 +143,189 @@
                     <span id="teamCountBadge" class="text-[10px] text-slate-400 font-extrabold">0 隊參賽</span>
                 </div>
                 <div id="leaderboardList" class="space-y-2">
-                    <div class="text-center py-8 text-xs text-slate-500">正在加載聯賽數據...</div>
+                    <div class="text-center py-8 text-xs text-slate-500">加載中...</div>
                 </div>
             </div>
         </section>
 
-        <!-- TAB 3: PLAYER CATALOG -->
+        <!-- USER TAB 3: PLAYER CATALOG -->
         <section id="tabCatalog" class="p-3.5 space-y-3 pb-12 flex-1 overflow-y-auto hidden">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
-                <span class="text-xs font-black text-slate-200 uppercase tracking-wider block">可選球員名單</span>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-black text-slate-200 uppercase tracking-wider block">球員名單 ('players')</span>
+                    <div class="flex gap-1 text-[10px]">
+                        <button onclick="filterCatalogView('ALL')" class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-bold">全部</button>
+                        <button onclick="filterCatalogView('DEF')" class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">DEF</button>
+                        <button onclick="filterCatalogView('MID')" class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">MID</button>
+                        <button onclick="filterCatalogView('ATT')" class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">ATT</button>
+                    </div>
+                </div>
                 <div id="catalogList" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
+            </div>
+        </section>
+
+        <!-- ADMIN DASHBOARD CONTAINER -->
+        <section id="tabAdmin" class="p-3.5 space-y-4 pb-12 flex-1 overflow-y-auto hidden">
+            <div class="bg-purple-950/40 border border-purple-500/30 rounded-2xl p-3 flex items-center justify-between">
+                <span class="text-xs font-black text-purple-300 flex items-center gap-1.5">
+                    <i class="fas fa-user-shield"></i> 管理員控制後台 (Admin Panel)
+                </span>
+                <button onclick="closeAdminView()" class="text-xs font-bold bg-slate-800 px-2.5 py-1 rounded-lg text-slate-300">
+                    <i class="fas fa-sign-out-alt"></i> 退出管理
+                </button>
+            </div>
+
+            <!-- Admin Sub Navigation -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+                <button id="btnAdminTabSettings" onclick="switchAdminSubTab('settings')" class="py-1.5 rounded-xl text-[11px] font-black bg-purple-600 text-white">聯賽設定</button>
+                <button id="btnAdminTabPlayers" onclick="switchAdminSubTab('players')" class="py-1.5 rounded-xl text-[11px] font-black bg-slate-800 text-slate-400">球員管理</button>
+                <button id="btnAdminTabStats" onclick="switchAdminSubTab('stats')" class="py-1.5 rounded-xl text-[11px] font-black bg-slate-800 text-slate-400">賽事數據</button>
+                <button id="btnAdminTabTeams" onclick="switchAdminSubTab('teams')" class="py-1.5 rounded-xl text-[11px] font-black bg-slate-800 text-slate-400">球隊結算</button>
+            </div>
+
+            <!-- ADMIN SUB 1: LEAGUE SETTINGS -->
+            <div id="adminSubSettings" class="space-y-4">
+                <!-- Gameweek End -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">1. 輪次結算 (Gameweek End)</span>
+                    <p class="text-[11px] text-slate-400">將當前輪次分數累加至總分、重置球員每場比賽表現，並推推進至下一輪 (GW + 1)。</p>
+                    <button onclick="adminEndGameweek()" class="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-2.5 rounded-xl text-xs transition">
+                        <i class="fas fa-[#00ff87] fa-forward"></i> 結算當前輪次並推進至下輪
+                    </button>
+                </div>
+
+                <!-- Announcement Banner -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">2. 即時滾動公告 (Announcement Banner)</span>
+                    <input type="text" id="adminAnnouncementInput" placeholder="輸入要廣播的公告內容..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none">
+                    <div class="flex gap-2">
+                        <button onclick="adminSaveAnnouncement()" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-black py-2 rounded-xl text-xs">發佈公告</button>
+                        <button onclick="adminClearAnnouncement()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-black px-4 py-2 rounded-xl text-xs">清除</button>
+                    </div>
+                </div>
+
+                <!-- Deadline Lock -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">3. 陣容提交截止鎖定 (Deadline Lock)</span>
+                    <input type="datetime-local" id="adminDeadlinePicker" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none">
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <button onclick="adminSetDeadline('now')" class="bg-red-950 border border-red-500/40 text-red-300 font-black py-2 rounded-xl text-[10px]">🔒 即時鎖定</button>
+                        <button onclick="adminSetDeadline('1h')" class="bg-slate-800 text-slate-200 font-black py-2 rounded-xl text-[10px]">⏳ 1小時後</button>
+                        <button onclick="adminSetDeadline('24h')" class="bg-slate-800 text-slate-200 font-black py-2 rounded-xl text-[10px]">📅 24小時後</button>
+                    </div>
+                    <button onclick="adminSaveDeadline()" class="w-full bg-purple-600 text-white font-black py-2 rounded-xl text-xs">儲存截止時間</button>
+                </div>
+
+                <!-- Reset League -->
+                <div class="bg-red-950/30 border border-red-500/30 rounded-2xl p-4 space-y-2">
+                    <span class="text-xs font-black text-red-400 uppercase tracking-wider block">4. 高風險：重置聯賽至 Game Week 1</span>
+                    <p class="text-[10px] text-slate-400">將清空所有球隊的累計分數、卡片使用記錄、比賽表現數據，並重置為第 1 輪。</p>
+                    <button onclick="adminResetLeague()" class="w-full bg-red-600 hover:bg-red-500 text-white font-black py-2.5 rounded-xl text-xs">重置整個聯賽 (Reset League)</button>
+                </div>
+            </div>
+
+            <!-- ADMIN SUB 2: PLAYER CATALOG -->
+            <div id="adminSubPlayers" class="space-y-4 hidden">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">新增 / 編輯球員</span>
+                    <input type="hidden" id="adminPlayerEditId">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-400">球員名字</label>
+                            <input type="text" id="adminPlayerName" placeholder="例如: 浩揚" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-bold text-white">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400">位置 (Position)</label>
+                            <select id="adminPlayerPos" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-bold text-white">
+                                <option value="DEF">DEF (後衛)</option>
+                                <option value="MID">MID (中場)</option>
+                                <option value="ATT">ATT (前鋒)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-slate-400">身價 (£m)</label>
+                        <input type="number" step="0.5" id="adminPlayerPrice" placeholder="5.0" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-bold text-white">
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="adminSavePlayer()" class="flex-1 bg-[#00ff87] text-slate-950 font-black py-2 rounded-xl text-xs">儲存球員</button>
+                        <button onclick="adminResetPlayerForm()" class="bg-slate-800 text-slate-300 font-bold px-3 py-2 rounded-xl text-xs">取消</button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-black text-slate-200">現有球員庫</span>
+                        <button onclick="adminRestoreDefaultPlayers()" class="text-[10px] bg-red-950 border border-red-500/40 text-red-300 px-2 py-1 rounded-lg font-bold">還原預設19位球員</button>
+                    </div>
+                    <div id="adminPlayersList" class="space-y-2 max-h-[350px] overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- ADMIN SUB 3: MATCH STATS ENTRY -->
+            <div id="adminSubStats" class="space-y-4 hidden">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">選擇球員錄入數據</span>
+                    <select id="adminStatPlayerSelect" onchange="loadPlayerStatsIntoForm()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white">
+                        <option value="">-- 請選擇球員 --</option>
+                    </select>
+
+                    <div id="statFormContainer" class="space-y-3 pt-2 border-t border-slate-800 hidden">
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <label class="text-[10px] text-slate-400">上陣時間 (分鐘)</label>
+                                <input type="number" id="statMinutes" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white font-bold" value="0">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">入球 (Goals)</label>
+                                <input type="number" id="statGoals" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white font-bold" value="0">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">助攻 (Assists)</label>
+                                <input type="number" id="statAssists" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white font-bold" value="0">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">不失球 (Clean Sheet)</label>
+                                <select id="statCleanSheet" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white font-bold">
+                                    <option value="false">否</option>
+                                    <option value="true">是</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">黃牌 (-1分)</label>
+                                <input type="number" id="statYellow" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white font-bold" value="0">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">紅牌 (-3分)</label>
+                                <input type="number" id="statRed" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white font-bold" value="0">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">烏龍球 (-2分)</label>
+                                <input type="number" id="statOwnGoal" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white font-bold" value="0">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">Bonus 加分 (0-3)</label>
+                                <input type="number" id="statBonus" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white font-bold" value="0" min="0" max="3">
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2 pt-2">
+                            <button onclick="adminSavePlayerMatchStats()" class="flex-1 bg-[#00ff87] text-slate-950 font-black py-2.5 rounded-xl text-xs">儲存數據並即時計算總分</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="adminClearAllMatchStats()" class="w-full bg-red-950/60 border border-red-500/40 text-red-300 font-black py-2.5 rounded-xl text-xs">
+                    清空所有球員本輪比賽數據 (Clear All Match Stats)
+                </button>
+            </div>
+
+            <!-- ADMIN SUB 4: TEAMS RESOLUTION -->
+            <div id="adminSubTeams" class="space-y-4 hidden">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <span class="text-xs font-black text-amber-400 uppercase tracking-wider block">球隊及特權卡 (Desmond / Benjie) 結算</span>
+                    <div id="adminTeamsResolutionList" class="space-y-3"></div>
+                </div>
             </div>
         </section>
 
@@ -144,15 +341,27 @@
             </div>
         </div>
 
+        <!-- Admin Password Modal -->
+        <div id="adminAuthModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-purple-500/40 w-full max-w-xs rounded-3xl p-5 space-y-4 text-center shadow-2xl">
+                <i class="fas fa-user-shield text-3xl text-purple-400"></i>
+                <h3 class="font-black text-sm text-white">請輸入管理員密碼</h3>
+                <input type="password" id="adminPasswordInput" placeholder="Passcode..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-center text-sm font-black text-white focus:outline-none focus:border-purple-500">
+                <div class="flex gap-2">
+                    <button onclick="verifyAdminPassword()" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-black py-2 rounded-xl text-xs">登入</button>
+                    <button onclick="closeAdminAuthModal()" class="bg-slate-800 text-slate-300 font-black px-3 py-2 rounded-xl text-xs">取消</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Firebase SDK (v11.6.1 ES Modules) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Provided Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBHCEBQ5UeCvKpu9BmTdC-mC3HaEUGiYhw",
             authDomain: "pcms-75e2a.firebaseapp.com",
@@ -164,12 +373,7 @@
             measurementId: "G-ZGYQCCFXQ6"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // Player Catalog Database
-        const PLAYERS = [
+        const DEFAULT_PLAYERS = [
             { id: 'p1', name: '維維', price: 3.0, position: 'DEF' },
             { id: 'p2', name: '咖哩', price: 6.0, position: 'MID' },
             { id: 'p3', name: '世朗', price: 5.0, position: 'DEF' },
@@ -212,54 +416,169 @@
             ]
         };
 
-        // App State
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global Dynamic Application State
+        let playersStore = [];
+        let teamsStore = [];
+        let leagueSettings = { gameweek: 1, deadline: '', announcement: '' };
+        
         let currentFormation = '1-2-1';
-        let slotSelections = {}; // { slotIndex: playerId }
+        let slotSelections = {};
         let captainId = null;
-        let activeChip = 'none'; // 'none' | 'desmond' | 'benjie'
+        let activeChip = 'none';
         let activePickerSlotIndex = null;
+        let catalogFilter = 'ALL';
 
-        // Initialize Firebase Anonymous Authentication
-        signInAnonymously(auth)
-            .then(() => {
-                const cloudStatusEl = document.getElementById('cloudStatus');
-                cloudStatusEl.className = "text-[10px] font-black px-2.5 py-1 rounded-full border bg-emerald-950 text-emerald-400 border-emerald-500/40 flex items-center gap-1";
-                document.getElementById('cloudStatusText').innerText = "雲端已連線";
-            })
-            .catch(err => {
-                console.error("Firebase Auth error:", err);
-                showToast("⚠️ Firebase 連線失敗");
-            });
-
-        // Realtime Listener for Firestore 'team' Collection
-        onSnapshot(collection(db, 'team'), (snapshot) => {
-            const teams = [];
-            snapshot.forEach(doc => {
-                teams.push({ id: doc.id, ...doc.data() });
-            });
-            teams.sort((a, b) => (b.points || 0) - (a.points || 0));
-            renderLeaderboard(teams);
-        }, (err) => {
-            console.error("Firestore reader error:", err);
+        // Firebase Auth
+        signInAnonymously(auth).then(() => {
+            const cloudStatusEl = document.getElementById('cloudStatus');
+            cloudStatusEl.className = "text-[10px] font-black px-2.5 py-1 rounded-full border bg-emerald-950 text-emerald-400 border-emerald-500/40 flex items-center gap-1";
+            document.getElementById('cloudStatusText').innerText = "雲端已連線";
+        }).catch(err => {
+            console.error(err);
+            showToast("⚠️ Firebase Auth 失敗");
         });
 
-        // Functions Exported to Window
+        // 1. Realtime Listener: 'players' Collection
+        onSnapshot(collection(db, 'players'), (snapshot) => {
+            const list = [];
+            snapshot.forEach(doc => {
+                list.push({ id: doc.id, ...doc.data() });
+            });
+            playersStore = list;
+            renderPitch();
+            renderCatalog();
+            populateAdminStatPlayersDropdown();
+            renderAdminPlayersList();
+        });
+
+        // 2. Realtime Listener: 'team' Collection
+        onSnapshot(collection(db, 'team'), (snapshot) => {
+            const list = [];
+            snapshot.forEach(doc => {
+                list.push({ id: doc.id, ...doc.data() });
+            });
+            teamsStore = list;
+            recalculateLeaderboard();
+            renderAdminTeamsResolution();
+        });
+
+        // 3. Realtime Listener: 'settings/league'
+        onSnapshot(doc(db, 'settings', 'league'), (docSnap) => {
+            if (docSnap.exists()) {
+                leagueSettings = docSnap.data();
+            } else {
+                leagueSettings = { gameweek: 1, deadline: '', announcement: '' };
+            }
+            updateLeagueSettingsUI();
+        });
+
+        // Calculates Individual Player Points based on Match Stats
+        function calculatePlayerGwPoints(player) {
+            const st = player.stats || {};
+            let pts = 0;
+            const mins = st.minutes || 0;
+            
+            if (mins >= 40) pts += 2;
+            else if (mins > 0) pts += 1;
+
+            const g = st.goals || 0;
+            if (player.position === 'DEF') pts += g * 6;
+            else if (player.position === 'MID') pts += g * 5;
+            else if (player.position === 'ATT') pts += g * 4;
+
+            pts += (st.assists || 0) * 3;
+
+            if (st.cleanSheet && mins > 0) {
+                if (player.position === 'DEF') pts += 4;
+                if (player.position === 'MID') pts += 1;
+            }
+
+            pts -= (st.yellowCards || 0) * 1;
+            pts -= (st.redCards || 0) * 3;
+            pts -= (st.ownGoals || 0) * 2;
+            pts += (st.bonus || 0);
+
+            return pts;
+        }
+
+        // Calculates Live GW Score for a Team
+        function calculateTeamGwScore(team) {
+            let gwPts = 0;
+            if (team.players) {
+                ['DEF', 'MID', 'ATT'].forEach(pos => {
+                    (team.players[pos] || []).forEach(p => {
+                        const storeP = playersStore.find(x => x.id === p.id);
+                        const basePts = storeP ? calculatePlayerGwPoints(storeP) : 0;
+                        gwPts += p.isCaptain ? basePts * 2 : basePts;
+                    });
+                });
+            }
+            gwPts += (team.desmondBonus || 0);
+            gwPts += (team.benjieBonus || 0);
+            return gwPts;
+        }
+
+        function updateLeagueSettingsUI() {
+            document.getElementById('headerGwBadge').innerText = `(GW${leagueSettings.gameweek || 1})`;
+            
+            // Announcement
+            const container = document.getElementById('announcementContainer');
+            if (leagueSettings.announcement) {
+                document.getElementById('announcementText').innerText = leagueSettings.announcement;
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+            }
+
+            // Deadline
+            const deadEl = document.getElementById('deadlineDisplayText');
+            if (leagueSettings.deadline) {
+                const deadDate = new Date(leagueSettings.deadline);
+                deadEl.innerText = deadDate.toLocaleString('zh-HK');
+                if (Date.now() > deadDate.getTime()) {
+                    deadEl.innerText += " (已截止 🔒)";
+                    deadEl.className = "font-black text-red-400";
+                } else {
+                    deadEl.className = "font-black text-amber-400";
+                }
+            } else {
+                deadEl.innerText = "未設定";
+            }
+        }
+
+        function recalculateLeaderboard() {
+            const sortedTeams = [...teamsStore].map(t => {
+                const liveGw = calculateTeamGwScore(t);
+                const total = (t.points || 0) + liveGw;
+                return { ...t, liveGw, total };
+            });
+
+            sortedTeams.sort((a, b) => b.total - a.total);
+            renderLeaderboard(sortedTeams);
+        }
+
+        // UI Handlers & Tab Switching
         window.switchTab = function(tabName) {
             document.getElementById('tabSquad').classList.add('hidden');
             document.getElementById('tabLeaderboard').classList.add('hidden');
             document.getElementById('tabCatalog').classList.add('hidden');
+            document.getElementById('tabAdmin').classList.add('hidden');
 
             document.getElementById('btnTabSquad').className = "py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 bg-slate-950 text-slate-400";
             document.getElementById('btnTabLeaderboard').className = "py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 bg-slate-950 text-slate-400";
             document.getElementById('btnTabCatalog').className = "py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 bg-slate-950 text-slate-400";
 
-            if(tabName === 'squad') {
+            if (tabName === 'squad') {
                 document.getElementById('tabSquad').classList.remove('hidden');
                 document.getElementById('btnTabSquad').className = "py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 bg-[#00ff87] text-slate-950 shadow";
-            } else if(tabName === 'leaderboard') {
+            } else if (tabName === 'leaderboard') {
                 document.getElementById('tabLeaderboard').classList.remove('hidden');
                 document.getElementById('btnTabLeaderboard').className = "py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 bg-[#00ff87] text-slate-950 shadow";
-            } else if(tabName === 'catalog') {
+            } else if (tabName === 'catalog') {
                 document.getElementById('tabCatalog').classList.remove('hidden');
                 document.getElementById('btnTabCatalog').className = "py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 bg-[#00ff87] text-slate-950 shadow";
                 renderCatalog();
@@ -270,7 +589,6 @@
             currentFormation = fmt;
             slotSelections = {};
             captainId = null;
-            
             ['121', '211', '112'].forEach(f => {
                 const btn = document.getElementById(`btnForm${f}`);
                 if (`${f.slice(0,1)}-${f.slice(1,2)}-${f.slice(2,3)}` === fmt) {
@@ -279,7 +597,6 @@
                     btn.className = "px-2.5 py-1 rounded-lg text-xs font-black transition bg-slate-950 text-slate-400 border border-slate-800";
                 }
             });
-
             renderPitch();
             updateBudgetDisplay();
         };
@@ -307,34 +624,26 @@
 
         window.selectPlayerForSlot = function(playerId) {
             if (activePickerSlotIndex === null) return;
-            
-            // Remove player if already chosen in another slot
             Object.keys(slotSelections).forEach(key => {
-                if(slotSelections[key] === playerId) delete slotSelections[key];
+                if (slotSelections[key] === playerId) delete slotSelections[key];
             });
-
             slotSelections[activePickerSlotIndex] = playerId;
-            if(!captainId) captainId = playerId;
-
+            if (!captainId) captainId = playerId;
             closePickerModal();
             renderPitch();
             updateBudgetDisplay();
         };
 
         window.setCaptain = function(playerId, e) {
-            if(e) e.stopPropagation();
+            if (e) e.stopPropagation();
             captainId = playerId;
             renderPitch();
         };
 
-        // Render Pitch Cards
         function renderPitch() {
             const container = document.getElementById('pitchSlotsContainer');
             container.innerHTML = '';
-
             const slots = FORMATIONS[currentFormation];
-            
-            // Group by position row for presentation
             const attSlots = slots.filter(s => s.pos === 'ATT');
             const midSlots = slots.filter(s => s.pos === 'MID');
             const defSlots = slots.filter(s => s.pos === 'DEF');
@@ -346,7 +655,7 @@
 
                 rowSlots.forEach(slot => {
                     const selectedPid = slotSelections[slot.id];
-                    const player = PLAYERS.find(p => p.id === selectedPid);
+                    const player = playersStore.find(p => p.id === selectedPid);
                     const isCap = player && captainId === player.id;
 
                     const card = document.createElement('div');
@@ -374,12 +683,11 @@
                             ${player ? player.name : slot.label}
                         </div>
                         <div class="w-full bg-[#38003c] text-[#00ff87] font-black text-[10px] sm:text-xs py-0.5 text-center rounded-b-lg shadow-md border-t border-purple-900/50">
-                            ${player ? `£${player.price.toFixed(1)}m` : '選擇球員'}
+                            ${player ? `£${Number(player.price).toFixed(1)}m` : '選擇球員'}
                         </div>
                     `;
                     rowDiv.appendChild(card);
                 });
-
                 container.appendChild(rowDiv);
             });
         }
@@ -391,7 +699,7 @@
             const container = document.getElementById('pickerListContainer');
             container.innerHTML = '';
 
-            PLAYERS
+            playersStore
                 .filter(p => p.position === slotConfig.pos)
                 .filter(p => p.name.toLowerCase().includes(query))
                 .forEach(p => {
@@ -403,7 +711,7 @@
                     item.innerHTML = `
                         <div>
                             <div class="font-extrabold text-xs text-white">${p.name}</div>
-                            <div class="text-[10px] text-slate-400">身價: £${p.price.toFixed(1)}m</div>
+                            <div class="text-[10px] text-slate-400">身價: £${Number(p.price).toFixed(1)}m</div>
                         </div>
                         ${isPicked ? '<span class="text-[10px] font-black bg-amber-400 text-slate-950 px-2 py-0.5 rounded">已選擇</span>' : '<button class="text-[10px] font-black bg-slate-800 text-slate-200 px-3 py-1 rounded-lg">選擇</button>'}
                     `;
@@ -413,8 +721,8 @@
 
         function calculateBudget() {
             return Object.values(slotSelections).reduce((sum, pid) => {
-                const player = PLAYERS.find(p => p.id === pid);
-                return sum + (player ? player.price : 0);
+                const player = playersStore.find(p => p.id === pid);
+                return sum + (player ? Number(player.price) : 0);
             }, 0);
         }
 
@@ -426,8 +734,16 @@
             el.className = remaining < 0 ? "text-xs font-black text-red-400" : "text-xs font-black text-[#00ff87]";
         }
 
-        // Handle Firestore Document Creation/Modification
+        // TEAM SUBMIT FUNCTION WITH DEADLINE ENFORCEMENT
         window.handleTeamSubmit = async function() {
+            if (leagueSettings.deadline) {
+                const deadlineMs = new Date(leagueSettings.deadline).getTime();
+                if (Date.now() > deadlineMs) {
+                    showToast("🔒 已超過提交截止時間，無法更新陣容！");
+                    return;
+                }
+            }
+
             const teamName = document.getElementById('teamNameInput').value.trim();
             if (!teamName) {
                 showToast("⚠️ 請輸入隊伍名稱！");
@@ -440,14 +756,15 @@
             }
 
             if (calculateBudget() > 18.0) {
-                showToast("⚠️ 總金額超出 £18.0m 預算限制！");
+                showToast("⚠️ 總金額超出 £18.0m 預算！");
                 return;
             }
 
-            // Group players into ATT, MID, DEF
+            const existingTeam = teamsStore.find(t => t.id === teamName);
+
             const groupedPlayers = { DEF: [], MID: [], ATT: [] };
             Object.values(slotSelections).forEach(pid => {
-                const p = PLAYERS.find(pl => pl.id === pid);
+                const p = playersStore.find(pl => pl.id === pid);
                 if (p && groupedPlayers[p.position]) {
                     groupedPlayers[p.position].push({
                         id: p.id,
@@ -458,36 +775,32 @@
                 }
             });
 
-            // Prepare Firestore Payload
             const payload = {
                 teamName: teamName,
                 formation: currentFormation,
                 players: groupedPlayers,
-                desmond: activeChip === 'desmond' ? 'using' : 'unused',
-                benjie: activeChip === 'benjie' ? 'using' : 'unused',
-                points: 0,
+                desmond: activeChip === 'desmond' ? 'using' : (existingTeam?.desmond === 'used' ? 'used' : 'unused'),
+                benjie: activeChip === 'benjie' ? 'using' : (existingTeam?.benjie === 'used' ? 'used' : 'unused'),
+                points: existingTeam?.points || 0,
                 updatedAt: Date.now()
             };
 
             try {
-                // Document ID set directly as Team Name
-                const docRef = doc(db, 'team', teamName);
-                await setDoc(docRef, payload, { merge: true });
-                showToast(`🎉 隊伍「${teamName}」成功儲存至 Firestore！`);
+                await setDoc(doc(db, 'team', teamName), payload, { merge: true });
+                showToast(`🎉 隊伍「${teamName}」成功儲存！`);
             } catch (err) {
-                console.error("Firestore Save Error:", err);
+                console.error("Save Team Error:", err);
                 showToast("❌ 儲存失敗: " + err.message);
             }
         };
 
-        // Render Real-Time Leaderboard Tab from Firestore
         function renderLeaderboard(teams) {
             const container = document.getElementById('leaderboardList');
             document.getElementById('teamCountBadge').innerText = `${teams.length} 隊參賽`;
             container.innerHTML = '';
 
             if (teams.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-xs text-slate-500">暫無數據 (Firestore Collection \'team\' 為空)</div>';
+                container.innerHTML = '<div class="text-center py-8 text-xs text-slate-500">暫無球隊數據</div>';
                 return;
             }
 
@@ -495,7 +808,6 @@
                 const card = document.createElement('div');
                 card.className = "bg-slate-950 border border-slate-800/80 rounded-xl p-3 space-y-2 shadow";
 
-                // Format players display list
                 let playerTags = [];
                 if (t.players) {
                     ['DEF', 'MID', 'ATT'].forEach(pos => {
@@ -513,11 +825,12 @@
                             </span>
                             <div>
                                 <div class="font-black text-xs text-white">${t.teamName || t.id}</div>
-                                <div class="text-[9px] text-slate-400">陣型: ${t.formation || 'N/A'} • Desmond: ${t.desmond || 'unused'} • Benjie: ${t.benjie || 'unused'}</div>
+                                <div class="text-[9px] text-slate-400">陣型: ${t.formation || 'N/A'} • 本輪即時: <span class="text-amber-400 font-bold">+${t.liveGw || 0}</span></div>
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-xs font-black text-[#00ff87]">${t.points || 0} 分</div>
+                            <div class="text-xs font-black text-[#00ff87]">${t.total || 0} 分</div>
+                            <div class="text-[9px] text-slate-500">累計: ${t.points || 0}</div>
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-1 pt-1 border-t border-slate-900">
@@ -528,10 +841,18 @@
             });
         }
 
+        window.filterCatalogView = function(pos) {
+            catalogFilter = pos;
+            renderCatalog();
+        };
+
         function renderCatalog() {
             const container = document.getElementById('catalogList');
             container.innerHTML = '';
-            PLAYERS.forEach(p => {
+            
+            const filtered = catalogFilter === 'ALL' ? playersStore : playersStore.filter(p => p.position === catalogFilter);
+
+            filtered.forEach(p => {
                 const item = document.createElement('div');
                 item.className = "bg-slate-950 border border-slate-800/80 rounded-xl p-2.5 flex items-center justify-between";
                 item.innerHTML = `
@@ -539,13 +860,341 @@
                         <span class="w-6 h-6 rounded-md flex items-center justify-center font-black text-[10px] ${p.position === 'DEF' ? 'bg-purple-950 text-purple-300 border border-purple-500/40' : p.position === 'MID' ? 'bg-blue-950 text-blue-300 border border-blue-500/40' : 'bg-red-950 text-red-300 border border-red-500/40'}">
                             ${p.position}
                         </span>
-                        <span class="font-extrabold text-xs text-white">${p.name}</span>
+                        <div>
+                            <span class="font-extrabold text-xs text-white block">${p.name}</span>
+                            <span class="text-[9px] text-slate-400">本輪得分: ${calculatePlayerGwPoints(p)} pts</span>
+                        </div>
                     </div>
-                    <span class="font-black text-xs text-[#00ff87]">£${p.price.toFixed(1)}m</span>
+                    <span class="font-black text-xs text-[#00ff87]">£${Number(p.price).toFixed(1)}m</span>
                 `;
                 container.appendChild(item);
             });
         }
+
+        // ADMIN PANEL LOGIC & PASSWORD AUTH
+        window.openAdminModal = function() {
+            document.getElementById('adminAuthModal').classList.remove('hidden');
+        };
+
+        window.closeAdminAuthModal = function() {
+            document.getElementById('adminAuthModal').classList.add('hidden');
+        };
+
+        window.verifyAdminPassword = function() {
+            const input = document.getElementById('adminPasswordInput').value;
+            if (input === '20211074') {
+                closeAdminAuthModal();
+                document.getElementById('adminPasswordInput').value = '';
+                showAdminDashboard();
+            } else {
+                showToast("❌ 密碼錯誤！ Access Denied.");
+            }
+        };
+
+        function showAdminDashboard() {
+            document.getElementById('tabSquad').classList.add('hidden');
+            document.getElementById('tabLeaderboard').classList.add('hidden');
+            document.getElementById('tabCatalog').classList.add('hidden');
+            document.getElementById('tabAdmin').classList.remove('hidden');
+            switchAdminSubTab('settings');
+        }
+
+        window.closeAdminView = function() {
+            switchTab('squad');
+        };
+
+        window.switchAdminSubTab = function(sub) {
+            ['settings', 'players', 'stats', 'teams'].forEach(s => {
+                document.getElementById(`adminSub${s.charAt(0).toUpperCase() + s.slice(1)}`).classList.add('hidden');
+            });
+            document.getElementById(`adminSub${sub.charAt(0).toUpperCase() + sub.slice(1)}`).classList.remove('hidden');
+        };
+
+        // ADMIN 1: LEAGUE SETTINGS FUNCTIONS
+        window.adminEndGameweek = async function() {
+            if (!confirm("確定要結算當前輪次？這將會把每隊本輪分數永久計入總分，重置每場比賽數據，並推進至下一輪！")) return;
+
+            try {
+                // 1. Commit live scores to accumulated points
+                for (let t of teamsStore) {
+                    const liveGw = calculateTeamGwScore(t);
+                    const newTotal = (t.points || 0) + liveGw;
+                    const desmondState = t.desmond === 'using' ? 'used' : (t.desmond || 'unused');
+                    const benjieState = t.benjie === 'using' ? 'used' : (t.benjie || 'unused');
+
+                    await setDoc(doc(db, 'team', t.id), {
+                        points: newTotal,
+                        desmond: desmondState,
+                        benjie: benjieState,
+                        desmondBonus: 0,
+                        benjieBonus: 0
+                    }, { merge: true });
+                }
+
+                // 2. Clear all players stats
+                for (let p of playersStore) {
+                    await setDoc(doc(db, 'players', p.id), { stats: {} }, { merge: true });
+                }
+
+                // 3. Advance Gameweek +1
+                const nextGw = (leagueSettings.gameweek || 1) + 1;
+                await setDoc(doc(db, 'settings', 'league'), { gameweek: nextGw }, { merge: true });
+
+                showToast(`✅ 輪次結算完成！已進入 GW${nextGw}`);
+            } catch (err) {
+                showToast("❌ 結算失敗: " + err.message);
+            }
+        };
+
+        window.adminSaveAnnouncement = async function() {
+            const msg = document.getElementById('adminAnnouncementInput').value.trim();
+            await setDoc(doc(db, 'settings', 'league'), { announcement: msg }, { merge: true });
+            showToast("📢 廣播公告已更新");
+        };
+
+        window.adminClearAnnouncement = async function() {
+            document.getElementById('adminAnnouncementInput').value = '';
+            await setDoc(doc(db, 'settings', 'league'), { announcement: '' }, { merge: true });
+            showToast("🧹 公告已清除");
+        };
+
+        window.adminSetDeadline = function(mode) {
+            const picker = document.getElementById('adminDeadlinePicker');
+            const now = new Date();
+            if (mode === 'now') {
+                picker.value = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            } else if (mode === '1h') {
+                const date = new Date(now.getTime() + 60 * 60 * 1000);
+                picker.value = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            } else if (mode === '24h') {
+                const date = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                picker.value = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            }
+        };
+
+        window.adminSaveDeadline = async function() {
+            const val = document.getElementById('adminDeadlinePicker').value;
+            await setDoc(doc(db, 'settings', 'league'), { deadline: val }, { merge: true });
+            showToast("🔒 截止時間已成功設定！");
+        };
+
+        window.adminResetLeague = async function() {
+            if (!confirm("⚠️ 高風險操作：確定要重置整個聯賽至 Gameweek 1？所有總分與卡片紀錄將清空！")) return;
+
+            try {
+                for (let t of teamsStore) {
+                    await setDoc(doc(db, 'team', t.id), {
+                        points: 0,
+                        desmond: 'unused',
+                        benjie: 'unused',
+                        desmondBonus: 0,
+                        benjieBonus: 0
+                    }, { merge: true });
+                }
+
+                for (let p of playersStore) {
+                    await setDoc(doc(db, 'players', p.id), { stats: {} }, { merge: true });
+                }
+
+                await setDoc(doc(db, 'settings', 'league'), { gameweek: 1, deadline: '', announcement: '' }, { merge: true });
+                showToast("🔄 聯賽已成功重置至 GW1");
+            } catch (err) {
+                showToast("❌ 重置失敗: " + err.message);
+            }
+        };
+
+        // ADMIN 2: PLAYER CATALOG MANAGEMENT
+        window.adminSavePlayer = async function() {
+            const id = document.getElementById('adminPlayerEditId').value || `p_${Date.now()}`;
+            const name = document.getElementById('adminPlayerName').value.trim();
+            const position = document.getElementById('adminPlayerPos').value;
+            const price = parseFloat(document.getElementById('adminPlayerPrice').value);
+
+            if (!name || isNaN(price)) {
+                showToast("⚠️ 請輸入完整的球員名字及正確身價！");
+                return;
+            }
+
+            try {
+                await setDoc(doc(db, 'players', id), { id, name, position, price }, { merge: true });
+                showToast(`✅ 球員「${name}」已儲存`);
+                adminResetPlayerForm();
+            } catch (err) {
+                showToast("❌ 儲存失敗: " + err.message);
+            }
+        };
+
+        window.adminEditPlayer = function(pid) {
+            const p = playersStore.find(x => x.id === pid);
+            if (!p) return;
+            document.getElementById('adminPlayerEditId').value = p.id;
+            document.getElementById('adminPlayerName').value = p.name;
+            document.getElementById('adminPlayerPos').value = p.position;
+            document.getElementById('adminPlayerPrice').value = p.price;
+        };
+
+        window.adminDeletePlayer = async function(pid) {
+            if (!confirm("確定要刪除此球員？")) return;
+            await deleteDoc(doc(db, 'players', pid));
+            showToast("🗑️ 球員已刪除");
+        };
+
+        window.adminResetPlayerForm = function() {
+            document.getElementById('adminPlayerEditId').value = '';
+            document.getElementById('adminPlayerName').value = '';
+            document.getElementById('adminPlayerPrice').value = '';
+        };
+
+        window.adminRestoreDefaultPlayers = async function() {
+            if (!confirm("確定要將 'players' 集合恢復為預設 19 位球員資料？")) return;
+            for (let p of DEFAULT_PLAYERS) {
+                await setDoc(doc(db, 'players', p.id), p);
+            }
+            showToast("🔄 預設球員庫已還原");
+        };
+
+        function renderAdminPlayersList() {
+            const container = document.getElementById('adminPlayersList');
+            container.innerHTML = '';
+            playersStore.forEach(p => {
+                const item = document.createElement('div');
+                item.className = "bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between";
+                item.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="text-[10px] font-black px-1.5 py-0.5 rounded ${p.position === 'DEF' ? 'bg-purple-950 text-purple-300' : p.position === 'MID' ? 'bg-blue-950 text-blue-300' : 'bg-red-950 text-red-300'}">${p.position}</span>
+                        <span class="font-bold text-xs text-white">${p.name}</span>
+                        <span class="text-xs text-[#00ff87] font-bold">£${Number(p.price).toFixed(1)}m</span>
+                    </div>
+                    <div class="flex gap-1">
+                        <button onclick="adminEditPlayer('${p.id}')" class="text-[10px] bg-slate-800 text-slate-200 px-2 py-1 rounded">編輯</button>
+                        <button onclick="adminDeletePlayer('${p.id}')" class="text-[10px] bg-red-950 text-red-300 px-2 py-1 rounded">刪除</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // ADMIN 3: MATCH STATS ENTRY
+        function populateAdminStatPlayersDropdown() {
+            const select = document.getElementById('adminStatPlayerSelect');
+            select.innerHTML = '<option value="">-- 請選擇球員 --</option>';
+            playersStore.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.innerText = `[${p.position}] ${p.name}`;
+                select.appendChild(opt);
+            });
+        }
+
+        window.loadPlayerStatsIntoForm = function() {
+            const pid = document.getElementById('adminStatPlayerSelect').value;
+            const form = document.getElementById('statFormContainer');
+            if (!pid) {
+                form.classList.add('hidden');
+                return;
+            }
+            form.classList.remove('hidden');
+            const p = playersStore.find(x => x.id === pid);
+            const st = p?.stats || {};
+
+            document.getElementById('statMinutes').value = st.minutes || 0;
+            document.getElementById('statGoals').value = st.goals || 0;
+            document.getElementById('statAssists').value = st.assists || 0;
+            document.getElementById('statCleanSheet').value = st.cleanSheet ? "true" : "false";
+            document.getElementById('statYellow').value = st.yellowCards || 0;
+            document.getElementById('statRed').value = st.redCards || 0;
+            document.getElementById('statOwnGoal').value = st.ownGoals || 0;
+            document.getElementById('statBonus').value = st.bonus || 0;
+        };
+
+        window.adminSavePlayerMatchStats = async function() {
+            const pid = document.getElementById('adminStatPlayerSelect').value;
+            if (!pid) return;
+
+            const stats = {
+                minutes: parseInt(document.getElementById('statMinutes').value) || 0,
+                goals: parseInt(document.getElementById('statGoals').value) || 0,
+                assists: parseInt(document.getElementById('statAssists').value) || 0,
+                cleanSheet: document.getElementById('statCleanSheet').value === "true",
+                yellowCards: parseInt(document.getElementById('statYellow').value) || 0,
+                redCards: parseInt(document.getElementById('statRed').value) || 0,
+                ownGoals: parseInt(document.getElementById('statOwnGoal').value) || 0,
+                bonus: parseInt(document.getElementById('statBonus').value) || 0
+            };
+
+            try {
+                await setDoc(doc(db, 'players', pid), { stats }, { merge: true });
+                showToast("⚽ 球員比賽數據已更新，總分已即時重新計算！");
+            } catch (err) {
+                showToast("❌ 數據儲存失敗: " + err.message);
+            }
+        };
+
+        window.adminClearAllMatchStats = async function() {
+            if (!confirm("確定要清空所有球員本輪的比賽數據？")) return;
+            for (let p of playersStore) {
+                await setDoc(doc(db, 'players', p.id), { stats: {} }, { merge: true });
+            }
+            showToast("🧹 所有比賽數據已清空");
+        };
+
+        // ADMIN 4: TEAMS & CHIPS SETTLEMENT
+        function renderAdminTeamsResolution() {
+            const container = document.getElementById('adminTeamsResolutionList');
+            container.innerHTML = '';
+
+            teamsStore.forEach(t => {
+                const liveGw = calculateTeamGwScore(t);
+                const item = document.createElement('div');
+                item.className = "bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2.5";
+
+                item.innerHTML = `
+                    <div class="flex items-center justify-between border-b border-slate-900 pb-2">
+                        <div>
+                            <span class="font-black text-xs text-white">${t.teamName || t.id}</span>
+                            <span class="text-[10px] text-slate-400 block">陣型: ${t.formation} • 本輪分數: <span class="text-amber-400 font-bold">+${liveGw}</span></span>
+                        </div>
+                        <button onclick="adminDeleteTeam('${t.id}')" class="text-[10px] bg-red-950 border border-red-500/40 text-red-300 px-2 py-1 rounded-lg">刪除隊伍</button>
+                    </div>
+
+                    <!-- Desmond Chip Settlement -->
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-[11px] font-bold text-purple-300">Desmond (+3/-3): <span class="text-slate-400">(${t.desmond || 'unused'})</span></span>
+                        <div class="flex gap-1">
+                            <button onclick="adminSettleChip('${t.id}', 'desmond', 3)" class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">勝 (+3)</button>
+                            <button onclick="adminSettleChip('${t.id}', 'desmond', -3)" class="text-[10px] bg-red-950 text-red-300 border border-red-500/30 px-2 py-0.5 rounded">負 (-3)</button>
+                            <button onclick="adminSettleChip('${t.id}', 'desmond', 0)" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">平 (0)</button>
+                        </div>
+                    </div>
+
+                    <!-- Benjie Chip Settlement -->
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-[11px] font-bold text-indigo-300">Benjie CS (+6): <span class="text-slate-400">(${t.benjie || 'unused'})</span></span>
+                        <div class="flex gap-1">
+                            <button onclick="adminSettleChip('${t.id}', 'benjie', 6)" class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">成功 CS (+6)</button>
+                            <button onclick="adminSettleChip('${t.id}', 'benjie', 0)" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">失敗 (0)</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        window.adminSettleChip = async function(teamId, chipType, bonusValue) {
+            const field = chipType === 'desmond' ? 'desmondBonus' : 'benjieBonus';
+            try {
+                await setDoc(doc(db, 'team', teamId), { [field]: bonusValue }, { merge: true });
+                showToast(`✅ 特權卡 ${chipType} 結算已設定加減分: ${bonusValue}`);
+            } catch (err) {
+                showToast("❌ 結算失敗: " + err.message);
+            }
+        };
+
+        window.adminDeleteTeam = async function(teamId) {
+            if (!confirm(`確定要刪除隊伍「${teamId}」？`)) return;
+            await deleteDoc(doc(db, 'team', teamId));
+            showToast("🗑️ 隊伍已刪除");
+        };
 
         function showToast(msg) {
             const toast = document.getElementById('toast');
@@ -554,7 +1203,7 @@
             setTimeout(() => toast.classList.add('hidden'), 3000);
         }
 
-        // Initial Render
+        // Initialize User Pitch Layout
         renderPitch();
     </script>
 </body>
